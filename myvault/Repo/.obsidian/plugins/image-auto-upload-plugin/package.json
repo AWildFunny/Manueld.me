@@ -1,0 +1,33 @@
+{
+  "name": "obsidian-imgur-plugin",
+  "version": "1.0.0",
+  "description": "This plugin uploads images from your clipboard to imgur.com and embeds uploaded image to your note",
+  "main": "main.js",
+  "scripts": {
+    "dev": "rollup --config rollup.config.js -w",
+    "build": "rollup --config rollup.config.js"
+  },
+  "keywords": [
+    "obsidian.md",
+    "imgur.com"
+  ],
+  "author": "Kirill Gavrilov",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^15.1.0",
+    "@rollup/plugin-node-resolve": "^9.0.0",
+    "@rollup/plugin-typescript": "^6.0.0",
+    "@types/node": "^14.14.2",
+    "@types/node-fetch": "^2.5.10",
+    "obsidian": "https://github.com/obsidianmd/obsidian-api/tarball/master",
+    "rollup": "^2.32.1",
+    "tslib": "^2.0.3",
+    "typescript": "^4.0.3"
+  },
+  "dependencies": {
+    "@rollup/plugin-json": "^4.1.0",
+    "axios": "^0.21.1",
+    "node-fetch": "^2.6.1",
+    "obsidian-http-request": "^1.4.0"
+  }
+}

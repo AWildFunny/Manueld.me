@@ -1,0 +1,22 @@
+{
+  "autoConvertHtml": true,
+  "alwaysUpdateLinks": true,
+  "promptDelete": false,
+  "livePreview": true,
+  "attachmentFolderPath": "Attachment",
+  "newFileLocation": "current",
+  "newFileFolderPath": "02笔记库",
+  "readableLineLength": true,
+  "defaultViewMode": "source",
+  "propertiesInDocument": "hidden",
+  "strictLineBreaks": false,
+  "foldIndent": false,
+  "pdfExportSettings": {
+    "includeName": true,
+    "pageSize": "A4",
+    "landscape": false,
+    "margin": "0",
+    "downscalePercent": 100
+  },
+  "showInlineTitle": true
+}

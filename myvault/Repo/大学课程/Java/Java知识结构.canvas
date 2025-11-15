@@ -1,0 +1,12 @@
+{
+	"nodes":[
+		{"id":"416cfe74976046d4","type":"link","url":"https://chatgpt.com/g/g-5lOowIIlY-javaxue-xi-zhu-shou/c/670dc385-9a38-8005-a640-189036878d25","x":-200,"y":-200,"width":400,"height":400},
+		{"id":"0faaf54a8664aae5","x":-560,"y":-30,"width":250,"height":60,"type":"text","text":"# 数组"},
+		{"id":"9567d8e74991e03a","type":"link","url":"https://chatgpt.com/g/g-5lOowIIlY-javaxue-xi-zhu-shou/c/6716eeb8-d6ec-8005-b1ad-2bbdca840e4c","x":-200,"y":320,"width":400,"height":400},
+		{"id":"a59dbb7b1fdb53c5","type":"text","text":"# 类和对象","x":-560,"y":490,"width":250,"height":60}
+	],
+	"edges":[
+		{"id":"dfd955b1bd54d219","fromNode":"a59dbb7b1fdb53c5","fromSide":"right","toNode":"9567d8e74991e03a","toSide":"left"},
+		{"id":"e51eb7de24e306fa","fromNode":"0faaf54a8664aae5","fromSide":"right","toNode":"416cfe74976046d4","toSide":"left"}
+	]
+}

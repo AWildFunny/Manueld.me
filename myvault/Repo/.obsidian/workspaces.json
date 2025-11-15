@@ -1,0 +1,264 @@
+{
+  "workspaces": {
+    "home": {
+      "main": {
+        "id": "a9296116cd528f7e",
+        "type": "split",
+        "children": [
+          {
+            "id": "642baef7c25bb988",
+            "type": "tabs",
+            "children": [
+              {
+                "id": "eeff12d3f2524f56",
+                "type": "leaf",
+                "pinned": true,
+                "state": {
+                  "type": "markdown",
+                  "state": {
+                    "file": "Templater/home.md",
+                    "mode": "preview",
+                    "backlinks": false,
+                    "source": false
+                  },
+                  "pinned": true
+                }
+              },
+              {
+                "id": "23484c20f9b3be4f",
+                "type": "leaf",
+                "pinned": true,
+                "state": {
+                  "type": "surfing-view",
+                  "state": {
+                    "url": "https://www.bilibili.com/"
+                  },
+                  "pinned": true
+                }
+              }
+            ]
+          }
+        ],
+        "direction": "vertical"
+      },
+      "left": {
+        "id": "b65d28f9cee49ca7",
+        "type": "split",
+        "children": [
+          {
+            "id": "c67f7c0e60d82c24",
+            "type": "tabs",
+            "dimension": 60.21052631578947,
+            "children": [
+              {
+                "id": "0c468a12159001c4",
+                "type": "leaf",
+                "state": {
+                  "type": "file-explorer",
+                  "state": {
+                    "sortOrder": "alphabetical"
+                  }
+                }
+              },
+              {
+                "id": "0eed29fd828824e1",
+                "type": "leaf",
+                "state": {
+                  "type": "file-tree-view",
+                  "state": {}
+                }
+              },
+              {
+                "id": "842947a162c5fb4b",
+                "type": "leaf",
+                "state": {
+                  "type": "search",
+                  "state": {
+                    "query": "",
+                    "matchingCase": false,
+                    "explainSearch": false,
+                    "collapseAll": false,
+                    "extraContext": false,
+                    "sortOrder": "alphabetical"
+                  }
+                }
+              },
+              {
+                "id": "9256c00ae8dacc92",
+                "type": "leaf",
+                "state": {
+                  "type": "bookmarks",
+                  "state": {}
+                }
+              }
+            ]
+          },
+          {
+            "id": "eb3ac6d1600a67a0",
+            "type": "tabs",
+            "dimension": 39.78947368421053,
+            "children": [
+              {
+                "id": "74ee6c3a8edaffbc",
+                "type": "leaf",
+                "state": {
+                  "type": "recent-files",
+                  "state": {}
+                }
+              }
+            ]
+          }
+        ],
+        "direction": "horizontal",
+        "width": 300
+      },
+      "right": {
+        "id": "5c00622e47bed8a4",
+        "type": "split",
+        "children": [
+          {
+            "id": "5d2f59c63bb10a1a",
+            "type": "tabs",
+            "children": [
+              {
+                "id": "d7a47e6a123fd0bd",
+                "type": "leaf",
+                "state": {
+                  "type": "markdown",
+                  "state": {
+                    "file": "Templater/彩色时钟.md",
+                    "mode": "preview",
+                    "backlinks": false,
+                    "source": false
+                  }
+                }
+              },
+              {
+                "id": "802cc333c8779588",
+                "type": "leaf",
+                "state": {
+                  "type": "calendar",
+                  "state": {}
+                }
+              }
+            ],
+            "currentTab": 1
+          },
+          {
+            "id": "145c33d93e95c574",
+            "type": "tabs",
+            "children": [
+              {
+                "id": "306064cc56c8590e",
+                "type": "leaf",
+                "state": {
+                  "type": "graph",
+                  "state": {}
+                }
+              },
+              {
+                "id": "b8ea339bfb00a586",
+                "type": "leaf",
+                "state": {
+                  "type": "kanban",
+                  "state": {
+                    "file": "10 演示文件夹/看板演示.md"
+                  }
+                }
+              },
+              {
+                "id": "5f99626599b2c00b",
+                "type": "leaf",
+                "state": {
+                  "type": "surfing-tab-tree",
+                  "state": {}
+                }
+              }
+            ]
+          },
+          {
+            "id": "b177cc7484fb34d9",
+            "type": "tabs",
+            "children": [
+              {
+                "id": "e55ca7c43b48204f",
+                "type": "leaf",
+                "state": {
+                  "type": "outgoing-link",
+                  "state": {
+                    "linksCollapsed": false,
+                    "unlinkedCollapsed": true
+                  }
+                }
+              },
+              {
+                "id": "3c5fd3b9e284f234",
+                "type": "leaf",
+                "state": {
+                  "type": "backlink",
+                  "state": {
+                    "collapseAll": false,
+                    "extraContext": false,
+                    "sortOrder": "alphabetical",
+                    "showSearch": false,
+                    "searchQuery": "",
+                    "backlinkCollapsed": false,
+                    "unlinkedCollapsed": true
+                  }
+                }
+              },
+              {
+                "id": "32c73f25dfe3320a",
+                "type": "leaf",
+                "state": {
+                  "type": "tag",
+                  "state": {
+                    "sortOrder": "frequency",
+                    "useHierarchy": true
+                  }
+                }
+              },
+              {
+                "id": "bf9e44eac4b6ea9c",
+                "type": "leaf",
+                "state": {
+                  "type": "outline",
+                  "state": {}
+                }
+              }
+            ],
+            "currentTab": 2
+          }
+        ],
+        "direction": "horizontal",
+        "width": 300
+      },
+      "left-ribbon": {
+        "hiddenItems": {
+          "daily-notes:打开/创建今天的日记": true,
+          "file-tree-alternative:File Tree Alternative Plugin": true,
+          "workspaces:管理工作区布局": false,
+          "command-palette:打开命令面板": false,
+          "switcher:打开快速切换": false,
+          "markdown-importer:打开 Markdown 格式转换器": false,
+          "canvas:新建白板": false,
+          "obsidian-excalidraw-plugin:新建 Excalidraw 绘图": false,
+          "graph:查看关系图谱": false,
+          "templates:插入模板": false,
+          "templater-obsidian:Templater": false,
+          "table-editor-obsidian:Advanced Tables Toolbar": false,
+          "obsidian-projects:Open projects": false,
+          "obsidian-weread-plugin:Weread": false,
+          "homepage:Open homepage": false,
+          "obsidian-memos:Memos": false,
+          "surfing:surfing-bookmark-manager": false
+        }
+      },
+      "active": "0c468a12159001c4",
+      "workspaces-plus:settings-v1": {
+        "explorerFoldState": []
+      }
+    }
+  },
+  "active": "home"
+}

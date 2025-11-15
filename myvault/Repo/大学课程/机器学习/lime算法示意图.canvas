@@ -1,0 +1,36 @@
+{
+	"nodes":[
+		{"id":"aebb22ce911e7b1c","type":"group","x":-240,"y":-160,"width":420,"height":540,"label":"核心1"},
+		{"id":"c945942f35ca94bc","type":"group","x":840,"y":-160,"width":382,"height":530,"label":"核心2"},
+		{"id":"cbe55cff012c6edc","type":"text","text":"生成邻域数据\n[[lime算法解析#生成邻域数据]]","x":-120,"y":-180,"width":180,"height":140},
+		{"id":"175554558c2bcd6c","type":"file","file":"02-学科/机器学习/inverse方法.md","x":-220,"y":60,"width":380,"height":280},
+		{"id":"43c2358958f784fd","type":"text","text":"标准化处理\n[[lime算法解析#标准化处理]]","x":280,"y":-180,"width":180,"height":140},
+		{"id":"3e0d64cb46f31b93","type":"text","text":"数据准备\n[[lime算法解析#数据准备]]","x":-560,"y":-180,"width":180,"height":140},
+		{"id":"cd397259b4c47ca2","type":"text","text":"计算距离\n[[lime算法解析#计算距离]]","x":280,"y":130,"width":180,"height":140},
+		{"id":"c67420a849b3fa3d","type":"text","text":"处理特征\n[[lime算法解析#处理特征]]","x":-270,"y":440,"width":180,"height":140},
+		{"id":"66661333911b979c","type":"file","file":"02-学科/机器学习/explain_instance_with_data方法.md","x":865,"y":60,"width":330,"height":280},
+		{"id":"458a84303f62055f","type":"text","text":"获取预测数据\n[[lime算法解析#获取预测数据]]","x":280,"y":-480,"width":180,"height":130},
+		{"id":"3d48cce9085a1dbd","type":"file","file":"02-学科/机器学习/inverse与data的区别.md","x":240,"y":-280,"width":360,"height":50},
+		{"id":"5d08bc8f7aee0bcf","type":"text","text":"生成局部解释\n[[lime算法解析#生成局部解释]]","x":940,"y":-180,"width":180,"height":140},
+		{"id":"8b97327a9db74879","type":"file","file":"02-学科/机器学习/Explanation类.md","x":875,"y":680,"width":320,"height":120},
+		{"id":"a917b190b5ab68d0","type":"text","text":"构造解释器\n[[lime算法解析#构造解释器]]","x":933,"y":440,"width":195,"height":140},
+		{"id":"8c5e8a68ea84f462","type":"text","text":"可视化输出","x":1360,"y":175,"width":160,"height":50}
+	],
+	"edges":[
+		{"id":"a4ccd76431d07f4a","fromNode":"3e0d64cb46f31b93","fromSide":"right","toNode":"cbe55cff012c6edc","toSide":"left","label":"data_row"},
+		{"id":"f08eb65a1fab8f75","fromNode":"cbe55cff012c6edc","fromSide":"bottom","toNode":"175554558c2bcd6c","toSide":"top","label":"调用"},
+		{"id":"c41eb1a97c463d2d","fromNode":"cbe55cff012c6edc","fromSide":"right","toNode":"43c2358958f784fd","toSide":"left","label":"data"},
+		{"id":"32db0f4c07884dc9","fromNode":"43c2358958f784fd","fromSide":"bottom","toNode":"cd397259b4c47ca2","toSide":"top","label":"scaled_data"},
+		{"id":"db3912fb98e9d9dc","fromNode":"cbe55cff012c6edc","fromSide":"right","toNode":"458a84303f62055f","toSide":"left","label":"inverse\n"},
+		{"id":"3408fe43eb680b30","fromNode":"a917b190b5ab68d0","fromSide":"bottom","toNode":"8b97327a9db74879","toSide":"top","label":"创建"},
+		{"id":"c23ce98907f12c18","fromNode":"43c2358958f784fd","fromSide":"right","toNode":"5d08bc8f7aee0bcf","toSide":"left","label":"scaled_data"},
+		{"id":"523958f9cf3e8980","fromNode":"cd397259b4c47ca2","fromSide":"right","toNode":"5d08bc8f7aee0bcf","toSide":"left","label":"distances"},
+		{"id":"f4d0db0e9288c69d","fromNode":"458a84303f62055f","fromSide":"right","toNode":"5d08bc8f7aee0bcf","toSide":"left","label":"yss"},
+		{"id":"e426ed297140bf23","fromNode":"a917b190b5ab68d0","fromSide":"right","toNode":"8c5e8a68ea84f462","toSide":"bottom"},
+		{"id":"d7ef149bde4b334b","fromNode":"5d08bc8f7aee0bcf","fromSide":"bottom","toNode":"66661333911b979c","toSide":"top","label":"调用"},
+		{"id":"0ea03776370b470f","fromNode":"a917b190b5ab68d0","fromSide":"top","toNode":"66661333911b979c","toSide":"bottom"},
+		{"id":"9bf4c793c7f51070","fromNode":"5d08bc8f7aee0bcf","fromSide":"right","toNode":"8c5e8a68ea84f462","toSide":"top"},
+		{"id":"60582e5280b31915","fromNode":"c67420a849b3fa3d","fromSide":"right","toNode":"a917b190b5ab68d0","toSide":"left","label":"features\n相关变量"},
+		{"id":"3fa197d07ffc0381","fromNode":"3e0d64cb46f31b93","fromSide":"bottom","toNode":"c67420a849b3fa3d","toSide":"left"}
+	]
+}

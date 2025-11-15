@@ -1,0 +1,24 @@
+{
+	"nodes":[
+		{"id":"fe8b5d0808110313","type":"file","file":"00-Assets/images/Pasted image 20241205165751.png","x":-960,"y":581,"width":400,"height":249},
+		{"id":"252ab657630490b6","type":"text","text":"## 不完全信息静态博弈\n**贝叶斯纳什均衡**\n求解方法：\n1. **海萨尼转换**：引入自然N作为参与人 -> 将其转换为完全不完美信息动态博弈\n2. 通过贝叶斯公式计算p\n3. 通过表格计算含p的各方案收益","x":-320,"y":581,"width":380,"height":320},
+		{"id":"e664d80f9792d62c","type":"text","text":"## 不完全信息动态博弈\n**精炼贝叶斯纳什均衡**\n","x":-320,"y":935,"width":380,"height":120},
+		{"id":"6fad02ed86db31a8","type":"file","file":"00-Assets/images/Pasted image 20241205174508.png","x":160,"y":677,"width":399,"height":129},
+		{"id":"54b120932f860e64","type":"text","text":"- 古诺寡头竞争模型-> 094-11.2.8 完全信息静态博弈-应用举例\n- 斯塔伯格博弈模型-> 095-11.3 完全信息动态博弈","x":180,"y":250,"width":360,"height":160},
+		{"id":"3bf28d7517ee97c7","type":"file","file":"00-Assets/images/Pasted image 20241205164200.png","x":141,"y":-20,"width":399,"height":152},
+		{"id":"4254fb484ab5afba","type":"file","file":"00-Assets/images/Pasted image 20241205160258.png","x":-960,"y":199,"width":400,"height":262},
+		{"id":"9acfd14a4e78d048","type":"text","text":"## 完全信息静态博弈\n表达形式：\n1. 策略式（基本式）\n2. 扩展式 -> [[博弈扩展式：虚线的含义]]\n>![[Pasted image 20241205161756.png]]\n\n\n纳什均衡求解：\n- 纯策略 -> **划线法**求解\n- 混合策略 -> **线性规划**求解\n","x":-320,"y":-130,"width":380,"height":380},
+		{"id":"3218ffcabe969e60","type":"text","text":"## 完全信息动态博弈\n求解方法：逆向递推\n\n\n所有子博弈都构成纳什均衡-> 该策略为**子博弈精炼纳什均衡**","x":-320,"y":330,"width":380,"height":220}
+	],
+	"edges":[
+		{"id":"973c012460338299","fromNode":"fe8b5d0808110313","fromSide":"right","toNode":"9acfd14a4e78d048","toSide":"left","label":"二人零和博弈\n= 矩阵博弈"},
+		{"id":"56f9b7ef04f2b49a","fromNode":"9acfd14a4e78d048","fromSide":"right","toNode":"3bf28d7517ee97c7","toSide":"left","label":"求解"},
+		{"id":"a8537b5d17709e79","fromNode":"fe8b5d0808110313","fromSide":"right","toNode":"3218ffcabe969e60","toSide":"left"},
+		{"id":"b23640309919ba73","fromNode":"3218ffcabe969e60","fromSide":"right","toNode":"54b120932f860e64","toSide":"bottom","label":"2"},
+		{"id":"c7a6264f47199e5e","fromNode":"3bf28d7517ee97c7","fromSide":"bottom","toNode":"54b120932f860e64","toSide":"top","label":"1"},
+		{"id":"15b3aa3e58b2580b","fromNode":"252ab657630490b6","fromSide":"right","toNode":"6fad02ed86db31a8","toSide":"left"},
+		{"id":"540fb0752db5a434","fromNode":"fe8b5d0808110313","fromSide":"right","toNode":"252ab657630490b6","toSide":"left"},
+		{"id":"6fdda98ec3703969","fromNode":"fe8b5d0808110313","fromSide":"right","toNode":"e664d80f9792d62c","toSide":"left"},
+		{"id":"6709f2f8b08ac59d","fromNode":"4254fb484ab5afba","fromSide":"bottom","toNode":"fe8b5d0808110313","toSide":"top"}
+	]
+}

@@ -1,0 +1,220 @@
+[
+  {
+    "fileName": "README",
+    "relativePath": "README.md",
+    "tags": [
+      "tag-test"
+    ],
+    "headings": [
+      {
+        "heading": "Perlite",
+        "level": 1
+      },
+      {
+        "heading": "Documentation on Github",
+        "level": 2
+      },
+      {
+        "heading": "Features",
+        "level": 2
+      },
+      {
+        "heading": "Changelog",
+        "level": 2
+      },
+      {
+        "heading": "Why Perlite?",
+        "level": 2
+      },
+      {
+        "heading": "Safe Mode Test",
+        "level": 2
+      }
+    ]
+  },
+  {
+    "fileName": "Markdown Samples",
+    "relativePath": "Demo Documents/Markdown Samples.md",
+    "tags": [
+      "tag-test",
+      "readme"
+    ],
+    "headings": [
+      {
+        "heading": "h1 Heading",
+        "level": 1
+      },
+      {
+        "heading": "h2 Heading",
+        "level": 2
+      },
+      {
+        "heading": "h3 Heading",
+        "level": 3
+      },
+      {
+        "heading": "h4 Heading",
+        "level": 4
+      },
+      {
+        "heading": "h5 Heading",
+        "level": 5
+      },
+      {
+        "heading": "h6 Heading",
+        "level": 6
+      },
+      {
+        "heading": "Horizontal Rules (--)",
+        "level": 2
+      },
+      {
+        "heading": "Tags",
+        "level": 2
+      },
+      {
+        "heading": "Emphasis",
+        "level": 2
+      },
+      {
+        "heading": "Lists",
+        "level": 2
+      },
+      {
+        "heading": "Paragraphs and Blockquote",
+        "level": 2
+      },
+      {
+        "heading": "Blockquote",
+        "level": 3
+      },
+      {
+        "heading": "Code",
+        "level": 2
+      },
+      {
+        "heading": "Tables",
+        "level": 2
+      }
+    ],
+    "backlinks": [
+      {
+        "fileName": "Links and Embedded",
+        "link": "Markdown Samples",
+        "relativePath": "Demo Documents/Links and Embedded.md"
+      },
+      {
+        "fileName": "Links and Embedded",
+        "link": "Markdown Samples",
+        "relativePath": "Demo Documents/Links and Embedded.md",
+        "displayText": "Custom Link Name"
+      }
+    ]
+  },
+  {
+    "fileName": "Links and Embedded",
+    "relativePath": "Demo Documents/Links and Embedded.md",
+    "headings": [
+      {
+        "heading": "External Links",
+        "level": 1
+      },
+      {
+        "heading": "Files",
+        "level": 1
+      },
+      {
+        "heading": "Links to Headings",
+        "level": 2
+      },
+      {
+        "heading": "Video",
+        "level": 2
+      },
+      {
+        "heading": "PDF",
+        "level": 2
+      }
+    ],
+    "links": [
+      {
+        "link": "Markdown Samples",
+        "relativePath": "Demo Documents/Markdown Samples.md"
+      },
+      {
+        "link": "Markdown Samples",
+        "displayText": "Custom Link Name",
+        "relativePath": "Demo Documents/Markdown Samples.md"
+      },
+      {
+        "link": "#PDF",
+        "relativePath": "Demo Documents/Links and Embedded.md",
+        "cleanLink": "Links and Embedded",
+        "displayText": "PDF"
+      },
+      {
+        "link": "#PDF",
+        "relativePath": "Demo Documents/Links and Embedded.md",
+        "cleanLink": "Links and Embedded",
+        "displayText": "Scroll to PDF"
+      }
+    ]
+  },
+  {
+    "fileName": "Latex and Mermaid",
+    "relativePath": "Demo Documents/Latex and Mermaid.md",
+    "headings": [
+      {
+        "heading": "LaTeX",
+        "level": 2
+      },
+      {
+        "heading": "Mermaid",
+        "level": 2
+      }
+    ]
+  },
+  {
+    "fileName": "Images",
+    "relativePath": "Demo Documents/Images.md",
+    "headings": [
+      {
+        "heading": "Internal Images",
+        "level": 1
+      },
+      {
+        "heading": "External images",
+        "level": 2
+      }
+    ]
+  },
+  {
+    "fileName": "Callouts and Frontmatter",
+    "relativePath": "Demo Documents/Callouts and Frontmatter.md",
+    "tags": [
+      "tag1",
+      "tag-test",
+      "readme"
+    ],
+    "frontmatter": {},
+    "aliases": [
+      "Callouts",
+      "Frontsmatter",
+      "Sample"
+    ],
+    "headings": [
+      {
+        "heading": "Blockquots",
+        "level": 1
+      },
+      {
+        "heading": "Callouts",
+        "level": 2
+      },
+      {
+        "heading": "Collapsible Callouts",
+        "level": 2
+      }
+    ]
+  }
+]

@@ -1,0 +1,21 @@
+{
+	"nodes":[
+		{"id":"498fa4da01076ac8","type":"text","text":"**Prompt 1**\n- 假如我要针对机器学习可解释机器学习在时间序列分析上的应用进行研究，从而寻找合适的方法，设计一个能源经济可解释预测系统。现在，我想从相关文献的角度展开研究，请提出一条研究思路，供我进行文献检索、阅读和学习","x":100,"y":-40,"width":380,"height":260},
+		{"id":"378ce7004850b424","type":"file","file":"02-学科/机器学习/时间序列解释方法.md","x":680,"y":-110,"width":400,"height":400},
+		{"id":"0c030b0aac313249","type":"file","file":"02-学科/机器学习/概念界定.md","x":680,"y":400,"width":400,"height":360},
+		{"id":"f8d0806932023b48","type":"text","text":"### 时间序列分析、时间序列预测、时间序列分类三者的区别与联系？","x":1160,"y":515,"width":340,"height":145},
+		{"id":"509429b2f6477231","x":1300,"y":-640,"width":400,"height":400,"type":"file","file":"04-素养/关于文献综述的GAP问题.md"},
+		{"id":"e236a32f68bef760","x":680,"y":-440,"width":480,"height":200,"type":"text","text":"**第一阶段指导**\n1 概念的理解：挖掘整理潜在信息→模型到底是什么\n2 GAP：...but...，当前文献侧重于什么，→[[关于文献综述的GAP问题]]\n3 文献阅读：摘要+关键词分类 → 领域细分 → 感兴趣领域划分"},
+		{"id":"b4955f84576fd41f","type":"text","text":"**关键问题**：\n- 构建可解释系统，对能源经济领域进行分析","x":-360,"y":210,"width":300,"height":160},
+		{"id":"318d6f558ef6f1d2","type":"text","text":"**关键词**：\n- 可解释机器学习\n- 时间序列分析/时间序列预测/时间序列分类\n- 环境/能源/环保/碳排放\n- 预测系统/可解释系统","x":-360,"y":-110,"width":300,"height":240}
+	],
+	"edges":[
+		{"id":"b47bba7f0e56bc86","fromNode":"0c030b0aac313249","fromSide":"right","toNode":"f8d0806932023b48","toSide":"left"},
+		{"id":"72ab89998ee99144","fromNode":"318d6f558ef6f1d2","fromSide":"right","toNode":"498fa4da01076ac8","toSide":"left"},
+		{"id":"7ff03abafc91ac4c","fromNode":"b4955f84576fd41f","fromSide":"right","toNode":"498fa4da01076ac8","toSide":"left"},
+		{"id":"6dc927242b7b78fe","fromNode":"498fa4da01076ac8","fromSide":"right","toNode":"378ce7004850b424","toSide":"left"},
+		{"id":"10d0da9ba650a3c7","fromNode":"498fa4da01076ac8","fromSide":"right","toNode":"0c030b0aac313249","toSide":"left"},
+		{"id":"fcedcbc52f537d4b","fromNode":"498fa4da01076ac8","fromSide":"right","toNode":"e236a32f68bef760","toSide":"left"},
+		{"id":"a3b03a1fe67f7b11","fromNode":"e236a32f68bef760","fromSide":"right","toNode":"509429b2f6477231","toSide":"left"}
+	]
+}

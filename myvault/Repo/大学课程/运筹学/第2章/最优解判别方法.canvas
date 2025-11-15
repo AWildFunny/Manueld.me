@@ -1,0 +1,30 @@
+{
+	"nodes":[
+		{"id":"b1f3212192d5bd7b","type":"text","text":"在单纯形法第2步：确定换入（入基）变量结束后，需要对检验数ZjZj​-CjCj​进行判别，从而判断是否达到最优解。","x":-720,"y":-170,"width":250,"height":160},
+		{"id":"88b5d9dcb3e49148","type":"text","text":"# 非基变量\n# 检验数$Z_j$-$C_j$","x":-400,"y":-155,"width":240,"height":130},
+		{"id":"7bdecc1c5c0fc805","type":"text","text":"# 非基变量\n# 检验数$Z_j$-$C_j$","x":320,"y":-235,"width":240,"height":130},
+		{"id":"48996e7896d12b62","type":"text","text":"# 是否含\n# 人工变量","x":-40,"y":-510,"width":200,"height":120},
+		{"id":"45df5acd6054f470","type":"text","text":"# 唯一最优解","x":760,"y":-25,"width":250,"height":65,"color":"1"},
+		{"id":"3681b6778e9fa889","type":"text","text":"# 无穷多最优解","x":760,"y":-390,"width":250,"height":60,"color":"1"},
+		{"id":"d1bb1629892b56c2","x":785,"y":-265,"width":200,"height":60,"type":"text","text":"当前解为其中之一"},
+		{"id":"bed407f67ac72f5b","type":"text","text":"# 判别系数\n# $b_{i}$ / $a_{ij}$ = $θ_{i}$","x":-40,"y":230,"width":260,"height":120},
+		{"id":"7031155859b13190","type":"text","text":"# 无界解","x":435,"y":80,"width":250,"height":60,"color":"1"},
+		{"id":"4bcc6cae9e44b2a4","type":"text","text":"# 继续求解","x":435,"y":350,"width":250,"height":60,"color":"5"},
+		{"id":"a2c136e3dc16ab80","type":"text","text":"# 是否为基变量\n# 且不为0","x":300,"y":-630,"width":280,"height":120},
+		{"id":"9ae44339a63daccf","type":"text","text":"# 无最优解","x":760,"y":-600,"width":250,"height":60,"color":"1"}
+	],
+	"edges":[
+		{"id":"3b72adac2efea4fd","fromNode":"88b5d9dcb3e49148","fromSide":"right","toNode":"48996e7896d12b62","toSide":"left","label":"≤0\n说明利润达到最大值\n即达到最优解"},
+		{"id":"30f1bb05c995c14b","fromNode":"88b5d9dcb3e49148","fromSide":"right","toNode":"bed407f67ac72f5b","toSide":"left","label":">0\n说明可以通过换基来增大利润\n即未达到最优解"},
+		{"id":"25d7b1264c02943c","fromNode":"48996e7896d12b62","fromSide":"right","toNode":"7bdecc1c5c0fc805","toSide":"left","label":"否"},
+		{"id":"f56a43874f01988e","fromNode":"7bdecc1c5c0fc805","fromSide":"right","toNode":"3681b6778e9fa889","toSide":"left","label":"存在0\n说明解在线上"},
+		{"id":"e7f04f3b103ec76a","fromNode":"bed407f67ac72f5b","fromSide":"right","toNode":"7031155859b13190","toSide":"left","label":"存在≤0\n说明可行域\n不存在顶点"},
+		{"id":"89269bcab75ab056","fromNode":"bed407f67ac72f5b","fromSide":"right","toNode":"4bcc6cae9e44b2a4","toSide":"left","label":"全部＞0"},
+		{"id":"5c984e32e80a5336","fromNode":"b1f3212192d5bd7b","fromSide":"right","toNode":"88b5d9dcb3e49148","toSide":"left"},
+		{"id":"2755fe82b639feb8","fromNode":"7bdecc1c5c0fc805","fromSide":"right","toNode":"45df5acd6054f470","toSide":"left","label":"均不为0\n说明解在顶点上"},
+		{"id":"9973843c417ddb9a","fromNode":"48996e7896d12b62","fromSide":"right","toNode":"a2c136e3dc16ab80","toSide":"left","label":"是"},
+		{"id":"fa834ad25cb1d2d9","fromNode":"a2c136e3dc16ab80","fromSide":"bottom","toNode":"7bdecc1c5c0fc805","toSide":"top","label":"否"},
+		{"id":"7c9edf2965e3dcaf","fromNode":"3681b6778e9fa889","fromSide":"bottom","toNode":"d1bb1629892b56c2","toSide":"top"},
+		{"id":"943cce9a1ddc39a5","fromNode":"a2c136e3dc16ab80","fromSide":"right","toNode":"9ae44339a63daccf","toSide":"left","label":"是"}
+	]
+}

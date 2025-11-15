@@ -1,0 +1,28 @@
+{
+	"nodes":[
+		{"id":"9ea6712a64477723","type":"group","x":-440,"y":-760,"width":1030,"height":450,"label":"计算机"},
+		{"id":"20bc493eefdfd25a","type":"group","x":-440,"y":-1100,"width":1005,"height":250,"label":"数学"},
+		{"id":"6299b3109057ac78","type":"text","text":"计算机/编程基础","x":-420,"y":-530,"width":250,"height":60},
+		{"id":"8934f6480128001f","type":"text","text":"数据库","x":-70,"y":-390,"width":250,"height":60},
+		{"id":"070bf633eebd04c5","type":"text","text":"数据结构","x":320,"y":-620,"width":250,"height":60},
+		{"id":"f4220baa0f0fa6c0","type":"text","text":"线代","x":-50,"y":-1080,"width":250,"height":60},
+		{"id":"847adf849acc70aa","type":"text","text":"运筹学","x":295,"y":-1080,"width":250,"height":60},
+		{"id":"98fa5d910f9d9fa0","type":"text","text":"概率","x":-50,"y":-930,"width":250,"height":60},
+		{"id":"a65d3f22e5f72b58","type":"text","text":"统计与计量","x":295,"y":-930,"width":250,"height":60},
+		{"id":"0d75513e6187a228","type":"text","text":"高数","x":-420,"y":-990,"width":250,"height":60},
+		{"id":"31758c8b6f0587c6","type":"text","text":"经济学","x":-420,"y":-200,"width":250,"height":60},
+		{"id":"8e4ad0bbd23815d3","type":"file","file":"00-Assets/images/专业培养方案.jpeg","x":-800,"y":-800,"width":228,"height":400},
+		{"id":"b29f865fe876adcd","type":"text","text":"Python","x":-70,"y":-680,"width":250,"height":60},
+		{"id":"45567e75756bc2b7","type":"text","text":"CPP面向对象","x":320,"y":-740,"width":250,"height":60}
+	],
+	"edges":[
+		{"id":"4001c2a05637f65f","fromNode":"6299b3109057ac78","fromSide":"right","toNode":"8934f6480128001f","toSide":"left"},
+		{"id":"fc1e2c047166a803","fromNode":"6299b3109057ac78","fromSide":"right","toNode":"b29f865fe876adcd","toSide":"left"},
+		{"id":"3fb80dcc6555f883","fromNode":"f4220baa0f0fa6c0","fromSide":"right","toNode":"847adf849acc70aa","toSide":"left"},
+		{"id":"06ba15bf93bd9a5b","fromNode":"98fa5d910f9d9fa0","fromSide":"right","toNode":"a65d3f22e5f72b58","toSide":"left"},
+		{"id":"bba91fea5dc80075","fromNode":"0d75513e6187a228","fromSide":"right","toNode":"f4220baa0f0fa6c0","toSide":"left"},
+		{"id":"d4872cbf1f2fc6de","fromNode":"0d75513e6187a228","fromSide":"right","toNode":"98fa5d910f9d9fa0","toSide":"left"},
+		{"id":"04e8d5622e8dba7f","fromNode":"b29f865fe876adcd","fromSide":"right","toNode":"45567e75756bc2b7","toSide":"left"},
+		{"id":"154e5b5f4a944d6d","fromNode":"b29f865fe876adcd","fromSide":"right","toNode":"070bf633eebd04c5","toSide":"left"}
+	]
+}

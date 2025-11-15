@@ -1,0 +1,39 @@
+{
+  "bookmarks": [
+    {
+      "id": "2014068036",
+      "name": "Obsidian",
+      "url": "https://obsidian.md/",
+      "description": "A awesome note-taking tool",
+      "category": [
+        "ROOT"
+      ],
+      "tags": "",
+      "created": 1672840861051,
+      "modified": 1672840861052
+    }
+  ],
+  "categories": [
+    {
+      "value": "ROOT",
+      "text": "ROOT",
+      "label": "ROOT",
+      "children": []
+    },
+    {
+      "value": "Obsidian",
+      "text": "Obsidian",
+      "label": "Obsidian"
+    },
+    {
+      "value": "CSS",
+      "text": "CSS",
+      "label": "CSS"
+    },
+    {
+      "value": "娱乐",
+      "text": "娱乐",
+      "label": "娱乐"
+    }
+  ]
+}

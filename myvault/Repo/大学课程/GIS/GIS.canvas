@@ -1,0 +1,9 @@
+{
+	"nodes":[
+		{"id":"9f2ce5d694c89eeb","x":-960,"y":-200,"width":400,"height":400,"type":"file","file":"02-学科/GIS/《地理信息系统》（第2版）陆守一，高等教育出版社，2017   .pdf"},
+		{"id":"782dc79a4d745516","x":-160,"y":-760,"width":400,"height":400,"type":"link","url":"https://malagis.com/category/com-post/"}
+	],
+	"edges":[
+		{"id":"49f12fd4f0ed2d3c","fromNode":"9f2ce5d694c89eeb","fromSide":"right","toNode":"782dc79a4d745516","toSide":"left","label":"博客课程"}
+	]
+}

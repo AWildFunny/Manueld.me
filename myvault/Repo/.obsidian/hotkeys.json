@@ -1,0 +1,45 @@
+{
+  "insert-template": [
+    {
+      "modifiers": [
+        "Alt"
+      ],
+      "key": "Q"
+    }
+  ],
+  "editor:insert-link": [],
+  "app:open-help": [],
+  "app:go-back": [],
+  "editor:follow-link": [],
+  "editor:delete-paragraph": [],
+  "workspace:toggle-pin": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "D"
+    }
+  ],
+  "keyboard-analyzer:show-shortcuts-analyzer-view": [
+    {
+      "modifiers": [],
+      "key": "F12"
+    }
+  ],
+  "obsidian-hover-editor:minimize-active-popover": [
+    {
+      "modifiers": [],
+      "key": "F10"
+    }
+  ],
+  "daily-notes": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "D"
+    }
+  ],
+  "workspace:goto-tab-3": [],
+  "workspace:goto-tab-2": []
+}

@@ -1,0 +1,18 @@
+{
+	"nodes":[
+		{"id":"5560b45a8d40c1d6","type":"text","text":"计算题3道（手算，掌握步骤过程）\n- Kmeans\n- 关联规则\n- 手算决策树（最难，分值最多，15-20）？啥玩意（预测算法）","x":-220,"y":-280,"width":380,"height":180},
+		{"id":"4d93265040192d6d","type":"text","text":"选择（会有一两道题拔高，需要对PPT足够熟悉）\n\n曼哈顿大概率会考","x":-220,"y":-60,"width":380,"height":120},
+		{"id":"05a0d46dfb290d74","type":"text","text":"以往试卷可能在百度文库","x":-220,"y":140,"width":380,"height":50},
+		{"id":"11ed65fa656fc76e","type":"file","file":"00-Assets/images/Pasted image 20250416140433.png","x":-230,"y":260,"width":400,"height":231},
+		{"id":"8481469abc919e8c","type":"text","text":"实验报告：分类/聚类尽量都用","x":-230,"y":640,"width":390,"height":60},
+		{"id":"cc6184ad5a035c4d","type":"text","text":"粒度可以理解为数据仓库中数据单元的细化程度。它决定了数据仓库中存储的数据的具体程度和汇总级别。\n主要是细粒度和粗粒度。\n","x":280,"y":165,"width":371,"height":147},
+		{"id":"147fbf46b9dcb3fb","type":"file","file":"00-Assets/images/Pasted image 20250416144734.png","x":280,"y":342,"width":399,"height":203},
+		{"id":"5474e4c514a8afd5","type":"text","text":"树相关的计算：优先画图（给很多分，几乎是15/20）+信息增益+ID3计算过程\n\na1 a2 a3 a4需要全部列出，然后是hd2","x":216,"y":-280,"width":404,"height":180},
+		{"id":"db4c72a606de4022","type":"text","text":"信息熵的概念（公式）","x":240,"y":-440,"width":250,"height":60},
+		{"id":"e5d02ed5852b2e5c","type":"file","file":"00-Assets/images/Pasted image 20250416164722.png","x":760,"y":-280,"width":400,"height":392}
+	],
+	"edges":[
+		{"id":"f15ad589e7de534c","fromNode":"11ed65fa656fc76e","fromSide":"right","toNode":"cc6184ad5a035c4d","toSide":"left"},
+		{"id":"7e61f812cd01a1cc","fromNode":"11ed65fa656fc76e","fromSide":"right","toNode":"147fbf46b9dcb3fb","toSide":"left"}
+	]
+}

@@ -1,0 +1,344 @@
+{
+  "main": {
+    "id": "a9296116cd528f7e",
+    "type": "split",
+    "children": [
+      {
+        "id": "54573fd1c1ddbf2b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "602c9273d21e2b1a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "解题框架/高数部分/版块 22 幂级数（仅数一）.md",
+                "mode": "source",
+                "source": false,
+                "backlinks": false
+              },
+              "icon": "lucide-file",
+              "title": "版块 22 幂级数（仅数一）"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b65d28f9cee49ca7",
+    "type": "split",
+    "children": [
+      {
+        "id": "c67f7c0e60d82c24",
+        "type": "tabs",
+        "dimension": 78.94736842105263,
+        "children": [
+          {
+            "id": "0c468a12159001c4",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "842947a162c5fb4b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "构建人类命运共同体",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "9256c00ae8dacc92",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          },
+          {
+            "id": "b69d804c4d2d5a99",
+            "type": "leaf",
+            "state": {
+              "type": "surfing-tab-tree",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "surfing-tab-tree"
+            }
+          },
+          {
+            "id": "309a51b0d97400a3",
+            "type": "leaf",
+            "state": {
+              "type": "recent-files",
+              "state": {},
+              "icon": "clock",
+              "title": "Recent Files"
+            }
+          },
+          {
+            "id": "bbbd88321737c259",
+            "type": "leaf",
+            "state": {
+              "type": "surfing-tab-tree",
+              "state": {},
+              "icon": "chrome",
+              "title": "Surfing Tab Tree"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eb3ac6d1600a67a0",
+        "type": "tabs",
+        "dimension": 21.052631578947366,
+        "children": [
+          {
+            "id": "74ee6c3a8edaffbc",
+            "type": "leaf",
+            "state": {
+              "type": "recent-files",
+              "state": {},
+              "icon": "clock",
+              "title": "Recent Files"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 331.49999618530273
+  },
+  "right": {
+    "id": "5c00622e47bed8a4",
+    "type": "split",
+    "children": [
+      {
+        "id": "5d2f59c63bb10a1a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d7a47e6a123fd0bd",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "新标签页"
+            }
+          },
+          {
+            "id": "802cc333c8779588",
+            "type": "leaf",
+            "state": {
+              "type": "calendar",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "calendar"
+            }
+          },
+          {
+            "id": "1924f827071f7d26",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "dc2a595c9307258f",
+            "type": "leaf",
+            "state": {
+              "type": "file-properties",
+              "state": {
+                "file": "解题框架/高数部分/版块 22 幂级数（仅数一）.md"
+              },
+              "icon": "lucide-info",
+              "title": "版块 22 幂级数（仅数一）的笔记属性"
+            }
+          }
+        ],
+        "currentTab": 1
+      },
+      {
+        "id": "b177cc7484fb34d9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e55ca7c43b48204f",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "解题框架/高数部分/版块 22 幂级数（仅数一）.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "版块 22 幂级数（仅数一） 的出链列表"
+            }
+          },
+          {
+            "id": "3c5fd3b9e284f234",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "解题框架/高数部分/版块 22 幂级数（仅数一）.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "版块 22 幂级数（仅数一） 的反向链接列表"
+            }
+          },
+          {
+            "id": "32c73f25dfe3320a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "bf9e44eac4b6ea9c",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "解题框架/高数部分/版块 22 幂级数（仅数一）.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "版块 22 幂级数（仅数一） 的大纲"
+            }
+          }
+        ],
+        "currentTab": 3
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "bases:创建新数据库": false,
+      "daily-notes:打开/创建今天的日记": true,
+      "workspaces:管理工作区布局": false,
+      "command-palette:打开命令面板": false,
+      "switcher:打开快速切换": false,
+      "markdown-importer:打开 Markdown 格式转换器": false,
+      "canvas:新建白板": false,
+      "templates:插入模板": false,
+      "graph:查看关系图谱": false,
+      "zk-prefixer:创建时间戳笔记": false,
+      "templater-obsidian:Templater": false,
+      "obsidian-excalidraw-plugin:新建绘图文件": false,
+      "obsidian-memos:Memos": false,
+      "obsidian-weread-plugin:Weread": false,
+      "surfing:surfing-bookmark-manager": false,
+      "obsidian-extract-pdf-highlights:PDF Highlights": false,
+      "obsidian-local-images-plus:Local Images Plus  0.15.9\r\nLocalize attachments (plugin folder)": false,
+      "oz-clear-unused-images:Clear Unused Images": false
+    }
+  },
+  "active": "602c9273d21e2b1a",
+  "lastOpenFiles": [
+    "解题框架/考研数学解题框架.md",
+    "解题框架/解题框架.canvas",
+    "解题框架/高数部分/版块 6 中值证明题.md",
+    "解题框架/高数部分/版块 1 极限的计算方法.md",
+    "解题框架/概率部分/版块 1 概率计算 (仅数一、数三).md",
+    "解题框架/概率部分/3.概率论与数理统计.md",
+    "解题框架/线代部分/版块 1 行列式计算方法.md",
+    "解题框架/概率部分/版块 3 点估计与区间估计 (仅数一、数三).md",
+    "解题框架/概率部分/版块 2 概率应用 (仅数一、数三).md",
+    "解题框架/高数部分/版块 21 常数项级数 (仅数一、数三).md",
+    "解题框架/高数部分/1.高等数学.md",
+    "解题框架/高数部分/版块 13 偏导数的计算方法.md",
+    "解题框架/高数部分/版块 11 高阶微分方程.md",
+    "解题框架/线代部分/版块 9 二次型基础.md",
+    "解题框架/线代部分/版块 10 二次型拔高.md",
+    "解题框架/高数部分/版块 19 曲线积分计算 (仅数一).md",
+    "解题框架/高数部分/版块 11 二阶及以上微分方程.md",
+    "解题框架/高数部分/版块 15 二重积分计算方法.md",
+    "解题框架/高数部分/版块 14 偏导数的应用.md",
+    "解题框架/高数部分/版块 5 导数的应用.md",
+    "Attachment/版块 7 特征值与特征向量_images/屏幕截图 2023-10-20 205734.png",
+    "Attachment/版块 7 特征值与特征向量_images",
+    "Attachment/版块 33 概率计算 (数二不要求)_images/概率计算例题1图.jpg",
+    "Attachment/版块 33 概率计算 (数二不要求)_images",
+    "Attachment/版块 17 二重积分计算方法_images/例题1计算二重积分.png",
+    "Attachment/版块 17 二重积分计算方法_images/例题1求二次积分.png",
+    "Attachment/版块 17 二重积分计算方法_images",
+    "Attachment/版块 15 偏导数的计算方法_images/屏幕截图 2023-10-15 235737.png",
+    "Attachment/版块 15 偏导数的计算方法_images",
+    "Attachment/版块 9 定积分应用_images/阿基米德螺线.png",
+    "Attachment/版块 9 定积分应用_images/玫瑰线.png",
+    "Attachment/版块 9 定积分应用_images/笛卡尔叶形线.png",
+    "Attachment/版块 9 定积分应用_images/摆线旋转体-绕y轴.png",
+    "Attachment/版块 9 定积分应用_images/星形线.png",
+    "Attachment/版块 9 定积分应用_images",
+    "Attachment/版块 8 定积分特性_images",
+    "Attachment/版块 5 导数的应用_images",
+    "解题框架/高数部分/版块 9 定积分应用_images",
+    "解题框架/高数部分/版块 8 定积分特性_images",
+    "解题框架/高数部分/版块 5 导数的应用_images",
+    "解题框架/高数部分/版块 22 幂级数（仅数一）.md",
+    "解题框架/高数部分/版块 20 曲面积分计算 (仅数一).md",
+    "解题框架/高数部分/版块 18 三重积分计算方法 (仅数一).md",
+    "解题框架/高数部分/版块 17 二重积分计算方法.md",
+    "解题框架/高数部分/版块 16 偏导数的应用.md",
+    "解题框架/高数部分/版块 15 偏导数的计算方法.md",
+    "Canvas/示例库结构一览.canvas",
+    "Canvas/代码块相关样式_middle.canvas",
+    "Canvas/TIPS.canvas",
+    "Canvas/Home_middle.canvas",
+    "Canvas/Formatting_Cheatsheet.canvas",
+    "Canvas/canvas白板介绍_middle.canvas",
+    "未命名 1.canvas",
+    "未命名 2.canvas",
+    "未命名.canvas"
+  ]
+}

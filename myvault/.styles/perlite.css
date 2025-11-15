@@ -1,0 +1,183 @@
+
+.logo {
+  position: fixed;
+  top: 8px;
+  left: 5px;
+}
+
+.custom-page {
+  text-align: center;
+  border-bottom: var(--divider-width) solid var(--divider-color);
+}
+
+.custom-page-logo {
+  border-radius: 50%;
+  width: 130px;
+}
+
+.social-logo {
+  width: 20px;
+}
+
+.social-media-list {
+  padding-left: 10px;
+  list-style-type: none;
+}
+
+.social-media-list li {
+  display: inline-block;
+  padding-right: 10px;
+}
+
+.sm-site-title {
+  padding-top: 0px;
+  padding-bottom: 10px;
+}
+
+.sm-site-desc {
+  padding-bottom: 10px;
+  max-width: 80%;
+  display: inline-block;
+}
+
+
+.sidebar-toggle-button.mod-left {
+  position: relative;
+  width: unset;
+}
+
+.collapse:not(.show) {
+  display: none;
+}
+
+.workspace-split.mod-vertical.mod-root {
+  min-width: 400px;
+}
+
+/* fix graph canvas height */
+#localGraph {
+  border: calc(0.5px + var(--divider-width)) solid var(--divider-color);
+  height: 50%;
+}
+
+#mynetwork {
+  height: 100%;
+}
+
+#graph_all{
+  height: 100%;
+}
+
+.is-sidedock-collapse {
+  display: none;
+  width: 0%;
+}
+
+.nav-buttons-container {
+  justify-content: right !important;
+}
+
+img {
+  display: initial !important;
+  max-width: 100%;
+}
+
+.images.center {
+  display: block !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.images.right {
+  display: block !important;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.popup-icon {
+  padding-bottom: 1px;
+  top: -6px;
+  position: relative;
+  left: 3px;
+}
+
+#loading-text {
+  position: absolute;
+  top: 8px;
+}
+
+.inline-title {
+  padding-bottom: 30px;
+}
+
+#mdContent h1:nth-of-type(1) {
+  padding-top: 0px !important;
+}
+
+h1, h2, h3, h4 {
+  padding-top: 30px;
+}
+
+.sidebar-top h3{
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+}
+
+.toc-item {
+  padding-left: 10px !important;
+}
+
+.metadata-text {
+  line-height: 1.9;
+  text-indent: 5px;
+}
+
+.is-collapsed-callout {
+  display: none;
+}
+
+.callout-title-inner * {
+  display: inline !important;
+  
+}
+
+span.cm-highlight {
+  background-color: var(--text-highlight-bg);
+  color: var(--text-normal);
+}
+
+#tags_container {
+  margin-top: 30px;
+}
+
+/* --------------- */
+/* Mobile / Responive Settings */
+
+@media screen and (max-width: 990px) {
+
+   .workspace-split.mod-horizontal.mod-right-split {
+    display: none;
+  } 
+  .workspace-split.mod-horizontal.mod-left-split {
+    width: 90vw !important;
+    max-width: 300px !important;
+  }
+
+  .markdown-preview-view {
+    padding: 10px !important;
+
+  }
+
+  .sidebar-toggle-button.mod-right {
+    display: none;
+  }
+
+  .workspace-split.mod-vertical.mod-root {
+    min-width: unset;
+  }
+
+  #mdContent {
+    padding-right: 30px;
+  }
+
+}

@@ -1,0 +1,5 @@
+{
+  "folder": "Diary",
+  "template": "Templater/tp/tp-日记模板-日历",
+  "format": "YYYY-MMM-Do-dddd"
+}

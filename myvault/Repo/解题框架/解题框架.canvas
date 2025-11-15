@@ -1,0 +1,33 @@
+{
+	"nodes":[
+		{"id":"a44efe9454325c40","x":20,"y":-260,"width":109,"height":61,"type":"text","text":"高等数学"},
+		{"id":"f4a0a2f10570e54f","x":-202,"y":-160,"width":553,"height":480,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 1 极限的计算方法.md"},
+		{"id":"bdaf1b1de672773b","x":-202,"y":400,"width":569,"height":480,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 2 极限的运用.md"},
+		{"id":"0f553848ceac247b","x":-202,"y":960,"width":569,"height":520,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 3 数列极限.md"},
+		{"id":"852877d65765487c","x":-202,"y":1560,"width":569,"height":520,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 4 导数的计算方法.md"},
+		{"id":"27fa6b21e9275613","x":-202,"y":2160,"width":569,"height":480,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 5 导数的应用.md"},
+		{"id":"5ecda1d52aadfccd","x":680,"y":-254,"width":114,"height":55,"type":"text","text":"线性代数"},
+		{"id":"4e66ccc7da1f21df","x":537,"y":-160,"width":503,"height":480,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 1 行列式计算方法.md"},
+		{"id":"b9bcd07a9fe12df4","x":537,"y":405,"width":503,"height":475,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 2 几类特殊矩阵.md"},
+		{"id":"6249c2e8fd35ec56","x":537,"y":960,"width":503,"height":520,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 3 矩阵的秩与运算.md"},
+		{"id":"a1e460b39360224f","x":537,"y":1560,"width":503,"height":520,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 4 方程组的解.md"},
+		{"id":"b3bad6a0f42b36b4","x":537,"y":2160,"width":503,"height":480,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 5 方程组理论的运用.md"},
+		{"id":"752be4f8e2ac9d84","x":537,"y":2720,"width":503,"height":457,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 6 向量组理论.md"},
+		{"id":"d9ae88172f8d62ed","x":537,"y":3259,"width":493,"height":400,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 7 特征值与特征向量.md"},
+		{"id":"7b895a99bfc5ac2f","x":537,"y":3720,"width":493,"height":451,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 8 相似理论.md"},
+		{"id":"ee08c2ba1c4fb3c9","x":537,"y":4240,"width":493,"height":447,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 9 二次型基础.md"},
+		{"id":"384ded9c0fc46e11","x":537,"y":4760,"width":503,"height":439,"type":"file","file":"02 Areas/考研数学/解题框架/线代部分/版块 10 二次型拔高.md"},
+		{"id":"04c3671abab5a402","x":1220,"y":-254,"width":170,"height":60,"type":"text","text":"概率论与数理统计"},
+		{"id":"0b3007b46402cd81","x":-202,"y":2720,"width":569,"height":457,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 6 中值证明题.md"},
+		{"id":"c6f13b9154431ca4","x":-202,"y":3259,"width":569,"height":461,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 7 积分方法.md"},
+		{"id":"5ddd7f395d13da9b","x":-202,"y":4840,"width":569,"height":491,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 10 一阶微分方程.md"},
+		{"id":"ae54bf42b95e43cb","x":-202,"y":3771,"width":569,"height":469,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 8 定积分特性.md"},
+		{"id":"f6cd1c9ac82cb8c6","x":-202,"y":4287,"width":569,"height":473,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 9 定积分应用.md"},
+		{"id":"9f5bcbeb42f89b70","x":-202,"y":5400,"width":569,"height":471,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 11 二阶及以上微分方程.md"},
+		{"id":"9f590ec0086ca114","x":-202,"y":5960,"width":569,"height":460,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 12 化为微分及解的性质.md"},
+		{"id":"b5be66f2a9660779","x":-202,"y":6480,"width":569,"height":400,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 13 偏导数的计算方法.md"},
+		{"id":"fc915879282c768b","x":-202,"y":6940,"width":569,"height":400,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 14 偏导数的应用.md"},
+		{"id":"2dc0414ad57e902b","x":-202,"y":7440,"width":569,"height":440,"type":"file","file":"02 Areas/考研数学/解题框架/高数部分/版块 15 二重积分计算方法.md"}
+	],
+	"edges":[]
+}

@@ -1,0 +1,12 @@
+# Intellij
+*.iml
+.idea
+
+# npm
+node_modules
+
+# build
+*.js.map
+
+# ignore
+data.json
