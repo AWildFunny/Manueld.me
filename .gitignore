@@ -18,6 +18,7 @@ desktop.ini
 # IDE 文件
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
