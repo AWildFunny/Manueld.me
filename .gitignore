@@ -1,0 +1,31 @@
+# AI Agent 工作文件夹 - 不参与版本控制
+@log/
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE 文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 备份文件
+*_backup_*
+*_backup.*
+
+# 其他临时文件
+*.cache
+
