@@ -1,6 +1,16 @@
 # AI Agent 工作文件夹 - 不参与版本控制
 @log/
 
+# Typecho 敏感文件
+config.inc.php
+
+# Typecho 用户上传文件
+usr/uploads/
+
+# Typecho 临时文件
+usr/tmp/
+usr/cache/
+
 # 日志文件
 *.log
 
