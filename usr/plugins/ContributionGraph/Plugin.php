@@ -310,7 +310,7 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
             } catch (Exception $e) {
                 // 如果日期已存在，则更新计数
                 $db->query($db->update('table.contributions')
-                    ->rows(array('count' => new Typecho_Db_Expr('count + ' . $count)))
+                    ->expression('count', 'count + ' . intval($count), false)
                     ->where('date = ?', $date));
             }
         }
@@ -393,7 +393,7 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         if ($existing) {
             // 更新计数
             $db->query($db->update('table.contributions')
-                ->rows(array('count' => new Typecho_Db_Expr('count + 1')))
+                ->expression('count', 'count + 1', false)
                 ->where('date = ?', $date));
         } else {
             // 插入新记录
