@@ -59,6 +59,23 @@ function exContent($content){
     <div class="alert" role="alert">$2</div>';
     $content = preg_replace($pattern, $replacement, $content);
 
+    // 折叠内容功能 [fold title="标题"]内容[/fold]
+    // 支持换行格式，使用 s 修饰符使 . 匹配换行符
+    $fold_pattern = '/\[fold\s+title=["\']([^"\']+)["\']\](.*?)\[\/fold\]/is';
+    $content = preg_replace_callback($fold_pattern, function($matches) {
+        $title = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
+        $fold_content = $matches[2];
+        // 生成唯一 ID 用于 JavaScript 控制
+        $fold_id = 'fold-' . uniqid();
+        return '<div class="fold-container" data-fold-id="' . $fold_id . '">
+            <div class="fold-header">
+                <span class="fold-icon">></span>
+                <span class="fold-title">' . $title . '</span>
+            </div>
+            <div class="fold-content">' . $fold_content . '</div>
+        </div>';
+    }, $content);
+
     // 文章 TOC 功能
     if (preg_match_all('/<h(\d)>(.*)<\/h\d>/isU', $content, $outarr)){
         $toc_out = "";

@@ -7,6 +7,12 @@
         $("main blockquote").addClass("shadow rounded");
         $("main pre").addClass("shadow rounded");
         $(".aplayer").addClass("shadow rounded");
+        
+        // 折叠内容功能
+        $('.fold-header').on('click', function() {
+            var $container = $(this).closest('.fold-container');
+            $container.toggleClass('active');
+        });
     });
     /*
      * Fancybox settings
@@ -56,6 +62,11 @@
             });
             APlayers[i].init();
         }
+        // 重新初始化折叠内容功能
+        $('.fold-header').off('click').on('click', function() {
+            var $container = $(this).closest('.fold-container');
+            $container.toggleClass('active');
+        });
     });
 </script>
 

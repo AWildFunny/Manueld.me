@@ -159,6 +159,88 @@ nav a:focus { color: var(--secondary-focus); }
     text-decoration: underline;
 }
 
+/* 折叠内容样式 */
+.fold-container {
+    margin: var(--typography-spacing-vertical) 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-box-shadow);
+    background-color: var(--background-color);
+    overflow: hidden;
+    transition: box-shadow 0.3s ease;
+}
+
+.fold-container:hover {
+    box-shadow: 0 20px 40px rgba(50, 50, 93, 0.15), 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.fold-header {
+    padding: calc(var(--spacing) * 0.75) var(--spacing);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 0.5);
+    background-color: var(--card-background-color);
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid transparent;
+}
+
+.fold-header:hover {
+    background-color: var(--secondary);
+    color: var(--secondary-inverse);
+}
+
+.fold-container.active .fold-header {
+    border-bottom-color: var(--border-color);
+}
+
+.fold-icon {
+    display: inline-block;
+    font-weight: bold;
+    font-size: 1.2em;
+    color: var(--primary);
+    transition: transform 0.3s ease;
+    line-height: 1;
+    min-width: 1em;
+    text-align: center;
+}
+
+.fold-container.active .fold-icon {
+    transform: rotate(90deg);
+}
+
+.fold-title {
+    flex: 1;
+    font-weight: 500;
+    color: var(--color);
+}
+
+.fold-container.active .fold-title {
+    color: var(--primary);
+}
+
+.fold-content {
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 var(--spacing);
+    transition: max-height 0.4s ease, padding 0.4s ease;
+    background-color: var(--background-color);
+}
+
+.fold-container.active .fold-content {
+    max-height: 5000px;
+    padding: var(--spacing);
+}
+
+.fold-content > *:first-child {
+    margin-top: 0;
+}
+
+.fold-content > *:last-child {
+    margin-bottom: 0;
+}
+
 blockquote {
     --font-family: Kai, "Kaiti SC", Georgia, "Times New Roman", Times, KaiTi, BiauKai, 'Noto Serif SC', serif;
     font-family: var(--font-family);

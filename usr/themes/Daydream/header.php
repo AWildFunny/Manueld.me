@@ -12,7 +12,19 @@
             'tag'       =>  '标签 %s 下的文章',
             'author'    =>  '%s 发布的文章'
         ), '', ' - '); ?><?php $this->options->title(); ?></title>
-    <link rel="apple-touch-icon" href="<?php $this->options->logoUrl() ?>">
+    <?php 
+    // 获取 logoUrl，如果为空或路径错误（包含 /usr/themes/ 但不包含正确的站点 URL），使用默认路径
+    $logoUrlValue = isset($this->options->logoUrl) ? trim($this->options->logoUrl) : '';
+    $defaultLogoUrl = $this->options->themeUrl('/assets/avatar.png', $this->options->theme);
+    
+    // 如果 logoUrl 为空，或者路径中包含 /usr/themes/ 但不在正确的站点 URL 下，使用默认路径
+    if (empty($logoUrlValue) || (strpos($logoUrlValue, '/usr/themes/') !== false && strpos($logoUrlValue, $this->options->siteUrl) === false)) {
+        $logoUrl = $defaultLogoUrl;
+    } else {
+        $logoUrl = $logoUrlValue;
+    }
+    ?>
+    <link rel="apple-touch-icon" href="<?php echo htmlspecialchars($logoUrl); ?>">
     <link rel="shortcut icon" href="<?php $this->options->themeUrl('/assets/favicon.ico')?>" />
     <link rel="bookmark" href="<?php $this->options->themeUrl('/assets/favicon.ico')?>" type="image/x-icon"/>
 
@@ -57,7 +69,19 @@
 <body>
 
 <header class="container">
-    <img class="headpic shadow" src="<?php $this->options->logoUrl()?>" alt="<?php $this->options->title() ?>" width=128 height=128>
+    <?php 
+    // 获取 logoUrl，如果为空或路径错误（包含 /usr/themes/ 但不包含正确的站点 URL），使用默认路径
+    $logoUrlValue = isset($this->options->logoUrl) ? trim($this->options->logoUrl) : '';
+    $defaultLogoUrl = $this->options->themeUrl('/assets/avatar.png', $this->options->theme);
+    
+    // 如果 logoUrl 为空，或者路径中包含 /usr/themes/ 但不在正确的站点 URL 下，使用默认路径
+    if (empty($logoUrlValue) || (strpos($logoUrlValue, '/usr/themes/') !== false && strpos($logoUrlValue, $this->options->siteUrl) === false)) {
+        $logoUrl = $defaultLogoUrl;
+    } else {
+        $logoUrl = $logoUrlValue;
+    }
+    ?>
+    <img class="headpic shadow" src="<?php echo htmlspecialchars($logoUrl); ?>" alt="<?php $this->options->title() ?>" width=128 height=128>
     <hgroup>
         <h1><?php $this->options->title()?></h1>
         <h4><?php $this->options->description()?></h4>
