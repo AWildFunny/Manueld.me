@@ -123,6 +123,16 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
             _t('短代码中未指定年份时使用的默认年份')
         );
         $form->addInput($defaultYear);
+        
+        // 说明区域内容
+        $description = new Typecho_Widget_Helper_Form_Element_Textarea(
+            'description',
+            null,
+            '贡献统计基于您在博客中的操作记录，包括内容发布、修改等活动。这些数据可以帮助您了解自己的博客维护频率和活跃度。',
+            _t('说明区域内容'),
+            _t('显示在贡献图表下方的说明文字，支持HTML标签')
+        );
+        $form->addInput($description);
     }
     
     /**
@@ -450,6 +460,7 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         $html .= '<div class="contribution-graph">';
         $html .= self::generateHeatmap($contributions, $year);
         $html .= '</div>';
+        $html .= '<div class="contribution-graph-footer">';
         $html .= '<div class="contribution-graph-legend">';
         $html .= '<span class="legend-label">少</span>';
         $html .= '<div class="legend-squares">';
@@ -460,6 +471,47 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         $html .= '</div>';
         $html .= '<span class="legend-label">多</span>';
         $html .= '</div>';
+        
+        // 添加说明区域（与图例同一行）
+        $html .= self::generateDescription($pluginOptions);
+        
+        $html .= '</div>';
+        $html .= '</div>';
+        
+        return $html;
+    }
+    
+    /**
+     * 生成说明区域
+     * 
+     * @access private
+     * @param object $pluginOptions 插件配置选项
+     * @return string HTML代码
+     */
+    private static function generateDescription($pluginOptions)
+    {
+        $description = !empty($pluginOptions->description) ? $pluginOptions->description : '';
+        
+        if (empty($description)) {
+            return '';
+        }
+        
+        // 允许HTML标签，但进行基本的安全处理
+        // 移除危险的标签和属性，保留基本的格式化标签
+        $allowedTags = '<p><br><strong><em><u><a><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><code><pre>';
+        $description = strip_tags($description, $allowedTags);
+        
+        // 转义HTML，用于data属性
+        $descriptionEscaped = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
+        
+        $html = '<div class="contribution-graph-description">';
+        $html .= '<button class="description-button" type="button" aria-label="这是什么">';
+        $html .= '<span class="description-label">这是什么</span>';
+        $html .= '<span class="description-icon">?</span>';
+        $html .= '<div class="description-tooltip">';
+        $html .= '<span class="description-tooltip-text">' . $description . '</span>';
+        $html .= '</div>';
+        $html .= '</button>';
         $html .= '</div>';
         
         return $html;
@@ -505,8 +557,8 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         // 计算该年份的第一天是星期几（0=周日, 1=周一, ...）
         $firstDay = strtotime($year . '-01-01');
         $dayOfWeek = date('w', $firstDay); // 0-6, 0是周日
-        // 转换为周一为0的格式
-        $offset = ($dayOfWeek == 0) ? 6 : $dayOfWeek - 1;
+        // 周日作为一周的开始，offset就是dayOfWeek本身
+        $offset = $dayOfWeek;
         
         // 计算该年份有多少天
         $daysInYear = date('z', strtotime($year . '-12-31')) + 1;
@@ -517,53 +569,70 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
             $totalWeeks = 53;
         }
         
+        // 定义常量
+        $squareSize = 11;
+        $squareMargin = 2;
+        $squareTotal = $squareSize + $squareMargin * 2; // 15px
+        $weekLabelWidth = 30;
+        $monthLabelHeight = 15;
+        
         // 生成月份标签
         $months = array('1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月');
         $monthLabels = array();
-        $lastMonth = -1;
-        for ($i = 0; $i < $totalWeeks; $i++) {
-            $weekStartDay = $i * 7 - $offset;
-            if ($weekStartDay >= 0 && $weekStartDay < $daysInYear) {
-                $date = date('Y-m-d', strtotime($year . '-01-01 +' . $weekStartDay . ' days'));
-                $month = intval(date('n', strtotime($date))) - 1;
-                // 只在月份变化时或第一周显示标签
-                if ($month != $lastMonth || $i == 0) {
-                    $monthLabels[$i] = $months[$month];
-                    $lastMonth = $month;
+        
+        // 记录每个月份的第一周位置
+        for ($month = 1; $month <= 12; $month++) {
+            $monthFirstDay = strtotime($year . '-' . sprintf('%02d', $month) . '-01');
+            $dayOfYear = date('z', $monthFirstDay);
+            // 计算该日期所在的周
+            $week = floor(($dayOfYear + $offset) / 7);
+            if ($week >= 0 && $week < $totalWeeks) {
+                if (!isset($monthLabels[$week])) {
+                    $monthLabels[$week] = $months[$month - 1];
                 }
             }
         }
         
-        $html = '<div class="contribution-graph-months">';
-        for ($i = 0; $i < $totalWeeks; $i++) {
-            $html .= '<div class="month-label">' . (isset($monthLabels[$i]) ? htmlspecialchars($monthLabels[$i]) : '') . '</div>';
+        // 生成热力图容器（使用绝对定位）
+        $html = '<div class="contribution-graph-heatmap-wrapper">';
+        
+        // 生成月份标签（绝对定位）
+        foreach ($monthLabels as $week => $monthLabel) {
+            $left = $weekLabelWidth + $week * $squareTotal;
+            $html .= '<div class="month-label" style="left: ' . $left . 'px;">' . htmlspecialchars($monthLabel) . '</div>';
         }
-        $html .= '</div>';
         
-        // 生成星期标签（只在左侧显示一次）
-        $weekLabels = array('周一', '周三', '周五');
-        $html .= '<div class="contribution-graph-weeks">';
-        foreach ($weekLabels as $label) {
-            $html .= '<div class="week-label">' . htmlspecialchars($label) . '</div>';
+        // 生成星期标签（绝对定位）
+        // 周日=0, 周一=1, 周二=2, 周三=3, 周四=4, 周五=5, 周六=6
+        // 显示：周一、周三、周五
+        // 周标签的行位置就是对应的day值（1=周一，3=周三，5=周五）
+        // 因为方块的位置计算是：top = monthLabelHeight + day * squareTotal
+        // 所以周标签也应该使用相同的day值来计算位置
+        $weekLabelMap = array(1 => '周一', 3 => '周三', 5 => '周五');
+        foreach ($weekLabelMap as $day => $label) {
+            $top = $monthLabelHeight + $day * $squareTotal;
+            $html .= '<div class="week-label" style="top: ' . $top . 'px;">' . htmlspecialchars($label) . '</div>';
         }
-        $html .= '</div>';
         
-        // 生成热力图网格
-        $html .= '<div class="contribution-graph-grid">';
-        
+        // 生成热力图网格（绝对定位）
         for ($week = 0; $week < $totalWeeks; $week++) {
             for ($day = 0; $day < 7; $day++) {
                 $dayIndex = $week * 7 + $day - $offset;
                 
+                // 计算位置
+                $left = $weekLabelWidth + $week * $squareTotal + $squareMargin;
+                $top = $monthLabelHeight + $day * $squareTotal + $squareMargin;
+                
                 if ($dayIndex < 0 || $dayIndex >= $daysInYear) {
                     // 不在该年份范围内的日期，显示空白
-                    $html .= '<div class="contribution-day empty"></div>';
+                    $html .= '<div class="contribution-day empty" style="left: ' . $left . 'px; top: ' . $top . 'px;"></div>';
                 } else {
                     $date = date('Y-m-d', strtotime($year . '-01-01 +' . $dayIndex . ' days'));
                     $count = isset($contributions[$date]) ? $contributions[$date] : 0;
                     $level = self::getContributionLevel($count);
                     
                     $html .= '<div class="contribution-day level-' . $level . '" ';
+                    $html .= 'style="left: ' . $left . 'px; top: ' . $top . 'px;" ';
                     $html .= 'data-date="' . htmlspecialchars($date) . '" ';
                     $html .= 'data-count="' . $count . '" ';
                     $html .= 'title="' . htmlspecialchars($date . ': ' . $count . ' 次贡献') . '">';
@@ -634,6 +703,19 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
     background: #fff;
     border-radius: 6px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    position: relative;
+}
+
+.contribution-day-tooltip {
+    position: fixed;
+    background: #24292e;
+    color: #fff;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 10000;
+    pointer-events: none;
 }
 
 .contribution-graph-header {
@@ -657,53 +739,39 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
     overflow-x: auto;
 }
 
-.contribution-graph-months {
-    display: flex;
-    margin-bottom: 5px;
-    padding-left: 30px;
-    width: calc(53 * 15px); /* 与grid宽度一致 */
-    max-width: 100%;
+.contribution-graph-heatmap-wrapper {
+    position: relative;
+    width: calc(30px + 53 * 15px); /* 周标签宽度 + 53周 * 15px */
+    height: calc(15px + 7 * 15px); /* 月份标签高度 + 7行 * 15px */
+    min-width: 100%;
 }
 
 .month-label {
-    width: 15px; /* 11px + 2px*2 margin */
+    position: absolute;
     font-size: 12px;
     color: #586069;
-    text-align: left;
-    padding-left: 2px;
-    flex-shrink: 0;
-}
-
-.contribution-graph-weeks {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    left: 0;
+    height: 15px;
+    line-height: 15px;
     top: 0;
-    height: 100%;
-    justify-content: space-around;
-    padding-top: 15px;
+    white-space: nowrap;
 }
 
 .week-label {
+    position: absolute;
     font-size: 12px;
     color: #586069;
-    height: 11px;
-    line-height: 11px;
-}
-
-.contribution-graph-grid {
-    display: flex;
-    flex-wrap: wrap;
-    padding-left: 30px;
-    width: calc(53 * 15px); /* 53周 * (11px + 2px*2 margin) */
-    max-width: 100%;
+    height: 15px;
+    line-height: 15px;
+    width: 30px;
+    left: 0;
+    text-align: right;
+    padding-right: 4px;
 }
 
 .contribution-day {
+    position: absolute;
     width: 11px;
     height: 11px;
-    margin: 2px;
     border-radius: 2px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -734,13 +802,21 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
     outline-offset: -1px;
 }
 
+.contribution-graph-footer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-top: 10px;
+    gap: 20px;
+}
+
 .contribution-graph-legend {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    margin-top: 10px;
     font-size: 12px;
     color: #586069;
+    flex-shrink: 0;
 }
 
 .legend-label {
@@ -770,31 +846,156 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
     background: #40c463;
 }
 
-.legend-square[data-level="3"] {
-    background: #30a14e;
-}
-
-@media (max-width: 768px) {
+ .legend-square[data-level="3"] {
+     background: #30a14e;
+ }
+ 
+ .contribution-graph-description {
+     flex-shrink: 0;
+ }
+ 
+ .description-button {
+     background: none;
+     border: none;
+     cursor: pointer;
+     padding: 0;
+     display: flex;
+     align-items: center;
+     gap: 4px;
+     color: #586069;
+     font-size: 12px;
+     transition: color 0.2s ease;
+     position: relative;
+ }
+ 
+ .description-button:hover {
+     color: #24292e;
+ }
+ 
+ .description-label {
+     font-size: 12px;
+     white-space: nowrap;
+ }
+ 
+ .description-icon {
+     display: inline-flex;
+     align-items: center;
+     justify-content: center;
+     width: 18px;
+     height: 18px;
+     border-radius: 50%;
+     background-color: #e1e4e8;
+     color: #586069;
+     font-weight: 600;
+     line-height: 1;
+     transition: background-color 0.2s ease, color 0.2s ease;
+ }
+ 
+ .description-button:hover .description-icon {
+     background-color: #d1d5da;
+     color: #24292e;
+ }
+ 
+ .description-tooltip {
+     position: absolute;
+     bottom: calc(100% + 8px);
+     left: 50%;
+     transform: translateX(-50%);
+     background: #f6f8fa;
+     color: #24292e;
+     padding: 8px 12px;
+     border-radius: 6px;
+     font-size: 12px;
+     line-height: 1.5;
+     white-space: normal;
+     max-width: 300px;
+     min-width: 200px;
+     z-index: 1000;
+     pointer-events: none;
+     opacity: 0;
+     visibility: hidden;
+     transition: opacity 0.2s ease, visibility 0.2s ease;
+     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+     word-wrap: break-word;
+     border: 1px solid #e1e4e8;
+ }
+ 
+ .description-tooltip::after {
+     content: "";
+     position: absolute;
+     top: 100%;
+     left: 50%;
+     transform: translateX(-50%);
+     border: 5px solid transparent;
+     border-top-color: #f6f8fa;
+ }
+ 
+ .description-tooltip::before {
+     content: "";
+     position: absolute;
+     top: 100%;
+     left: 50%;
+     transform: translateX(-50%);
+     border: 6px solid transparent;
+     border-top-color: #e1e4e8;
+     margin-top: -1px;
+ }
+ 
+ .description-button:hover .description-tooltip {
+     opacity: 1;
+     visibility: visible;
+ }
+ 
+ .description-tooltip-text {
+     display: block;
+ }
+ 
+ .description-tooltip-text p {
+     margin: 4px 0;
+ }
+ 
+ .description-tooltip-text p:first-child {
+     margin-top: 0;
+ }
+ 
+ .description-tooltip-text p:last-child {
+     margin-bottom: 0;
+ }
+ 
+ .description-tooltip-text ul,
+ .description-tooltip-text ol {
+     margin: 4px 0;
+     padding-left: 18px;
+ }
+ 
+ .description-tooltip-text li {
+     margin: 2px 0;
+ }
+ 
+ @media (max-width: 768px) {
     .contribution-graph-container {
         padding: 15px;
     }
     
-    .contribution-graph-grid {
-        width: 100%;
-        max-width: 583px;
-    }
-    
-    .contribution-graph-months {
-        padding-left: 25px;
-    }
-    
-    .contribution-graph-weeks {
-        padding-top: 12px;
-    }
-    
-    .month-label, .week-label {
-        font-size: 10px;
-    }
+     .contribution-graph-heatmap-wrapper {
+         width: 100%;
+         min-width: calc(30px + 53 * 15px);
+     }
+     
+     .month-label, .week-label {
+         font-size: 10px;
+     }
+     
+     .contribution-graph-footer {
+         flex-direction: column;
+         align-items: flex-start;
+         gap: 10px;
+     }
+     
+     .contribution-graph-legend {
+         width: 100%;
+         justify-content: flex-start;
+     }
 }
 </style>';
     }
@@ -808,51 +1009,56 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
     private static function getScripts()
     {
         return '<script>
-(function() {
-    function initContributionGraph() {
-        const containers = document.querySelectorAll(".contribution-graph-container");
-        
-        containers.forEach(function(container) {
-            if (container.dataset.initialized) return;
-            container.dataset.initialized = "true";
-            
-            const days = container.querySelectorAll(".contribution-day:not(.empty)");
-            
-            days.forEach(function(day) {
-                day.addEventListener("mouseenter", function(e) {
-                    const date = this.dataset.date;
-                    const count = parseInt(this.dataset.count) || 0;
-                    const tooltip = document.createElement("div");
-                    tooltip.className = "contribution-tooltip";
-                    tooltip.textContent = date + ": " + count + " 次贡献";
-                    tooltip.style.position = "absolute";
-                    tooltip.style.background = "#24292e";
-                    tooltip.style.color = "#fff";
-                    tooltip.style.padding = "5px 8px";
-                    tooltip.style.borderRadius = "3px";
-                    tooltip.style.fontSize = "12px";
-                    tooltip.style.whiteSpace = "nowrap";
-                    tooltip.style.zIndex = "1000";
-                    tooltip.style.pointerEvents = "none";
-                    
-                    document.body.appendChild(tooltip);
-                    
-                    const rect = this.getBoundingClientRect();
-                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + "px";
-                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + "px";
-                    
-                    this._tooltip = tooltip;
-                });
-                
-                day.addEventListener("mouseleave", function() {
-                    if (this._tooltip) {
-                        this._tooltip.remove();
-                        this._tooltip = null;
-                    }
-                });
-            });
-        });
-    }
+ (function() {
+     function initContributionGraph() {
+         const containers = document.querySelectorAll(".contribution-graph-container");
+         
+         containers.forEach(function(container) {
+             if (container.dataset.initialized) return;
+             container.dataset.initialized = "true";
+             
+             const days = container.querySelectorAll(".contribution-day:not(.empty)");
+             
+             days.forEach(function(day) {
+                 day.addEventListener("mouseenter", function(e) {
+                     const date = this.dataset.date;
+                     const count = parseInt(this.dataset.count) || 0;
+                     
+                     // 移除之前的提示框
+                     const existingTooltip = container.querySelector(".contribution-day-tooltip");
+                     if (existingTooltip) {
+                         existingTooltip.remove();
+                     }
+                     
+                     const tooltip = document.createElement("div");
+                     tooltip.className = "contribution-day-tooltip";
+                     tooltip.textContent = date + ": " + count + " 次贡献";
+                     
+                     // 将提示框添加到容器中，确保不被遮挡
+                     container.appendChild(tooltip);
+                     
+                     // 计算位置：使用fixed定位相对于视口
+                     const dayRect = this.getBoundingClientRect();
+                     
+                     // 设置提示框位置（在方块上方居中）
+                     // 使用fixed定位，确保在容器外也能正常显示
+                     tooltip.style.left = (dayRect.left + dayRect.width / 2 - tooltip.offsetWidth / 2) + "px";
+                     tooltip.style.top = (dayRect.top - tooltip.offsetHeight - 8) + "px";
+                     
+                     this._tooltip = tooltip;
+                 });
+                 
+                 day.addEventListener("mouseleave", function() {
+                     const tooltip = container.querySelector(".contribution-day-tooltip");
+                     if (tooltip) {
+                         tooltip.remove();
+                     }
+                     this._tooltip = null;
+                 });
+             });
+             
+         });
+     }
     
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initContributionGraph);
