@@ -13,8 +13,22 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         $refererPart = parse_url($referer);
         $currentPart = parse_url(Helper::options()->siteUrl);
         
-        if ($refererPart['host'] != $currentPart['host'] ||
-        0 !== strpos($refererPart['path'], $currentPart['path'])) {
+        // 安全获取路径，如果不存在或为空则使用默认值 '/'
+        $refererPath = isset($refererPart['path']) && !empty($refererPart['path']) ? $refererPart['path'] : '/';
+        $currentPath = isset($currentPart['path']) && !empty($currentPart['path']) ? $currentPart['path'] : '/';
+        
+        // 确保路径以 '/' 开头，便于比较（路径已保证不为空）
+        if ($refererPath[0] !== '/') {
+            $refererPath = '/' . $refererPath;
+        }
+        if ($currentPath[0] !== '/') {
+            $currentPath = '/' . $currentPath;
+        }
+        
+        // 检查主机名和路径前缀
+        if (!isset($refererPart['host']) || !isset($currentPart['host']) ||
+            $refererPart['host'] != $currentPart['host'] ||
+            0 !== strpos($refererPath, $currentPath)) {
             exit;
         }
     
