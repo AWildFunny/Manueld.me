@@ -303,28 +303,63 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $outputDebugHeader();
             
             // 关键：完全禁用 Typecho 的响应处理机制
-            // 1. 禁用自动发送响应头
-            if (method_exists($this->response, 'enableAutoSendHeaders')) {
+            // 注意：$this->response 是 Typecho\Widget\Response 包装类
+            // 真正的 Response 对象在内部的 $response 属性中，或者使用 Response::getInstance()
+            
+            // 1. 获取真正的 Response 对象
+            // $this->response 是 Typecho\Widget\Response 包装类
+            // 真正的 Response 对象是 Typecho\Response，可以通过 getInstance() 获取
+            $realResponse = null;
+            try {
+                // 方法1：通过 Response::getInstance() 获取单例（推荐）
+                $realResponse = \Typecho\Response::getInstance();
+                $addStep('获取 Response 对象成功（通过 getInstance()）');
+            } catch (Exception $e) {
+                // 方法2：如果方法1失败，通过反射访问包装类内部的 response 属性
+                try {
+                    $widgetResponseReflection = new ReflectionClass($this->response);
+                    if ($widgetResponseReflection->hasProperty('response')) {
+                        $responseProp = $widgetResponseReflection->getProperty('response');
+                        $responseProp->setAccessible(true);
+                        $realResponse = $responseProp->getValue($this->response);
+                        $addStep('获取 Response 对象成功（通过反射）');
+                    }
+                } catch (Exception $e2) {
+                    $addStep('警告: 无法获取 Response 对象', array('error' => $e2->getMessage()));
+                }
+            }
+            
+            // 2. 禁用自动发送响应头
+            if ($realResponse && method_exists($realResponse, 'enableAutoSendHeaders')) {
+                $realResponse->enableAutoSendHeaders(false);
+            } else if (method_exists($this->response, 'enableAutoSendHeaders')) {
                 $this->response->enableAutoSendHeaders(false);
             }
             
-            // 2. 启用 sandbox 模式，完全禁用 Response 对象的响应头发送
+            // 3. 启用 sandbox 模式，完全禁用 Response 对象的响应头发送
             // 这是最关键的：sandbox 模式下，sendHeaders() 会直接返回，不会发送任何响应头
-            if (method_exists($this->response, 'beginSandbox')) {
-                $this->response->beginSandbox();
+            if ($realResponse && method_exists($realResponse, 'beginSandbox')) {
+                $realResponse->beginSandbox();
+                $addStep('Sandbox 模式已启用（通过 Response::getInstance()）');
             } else {
                 // 如果方法不存在，使用反射设置 sandbox 属性
                 try {
-                    $responseReflection = new ReflectionClass($this->response);
+                    $targetResponse = $realResponse ?: $this->response;
+                    $responseReflection = new ReflectionClass($targetResponse);
                     if ($responseReflection->hasProperty('sandbox')) {
                         $sandboxProp = $responseReflection->getProperty('sandbox');
                         $sandboxProp->setAccessible(true);
-                        $sandboxProp->setValue($this->response, true);
+                        $sandboxProp->setValue($targetResponse, true);
+                        $addStep('Sandbox 模式已启用（通过反射）');
+                    } else {
+                        $addStep('警告: 无法找到 sandbox 属性');
                     }
                 } catch (Exception $e) {
-                    // 如果无法设置 sandbox，继续执行
+                    $addStep('警告: 设置 sandbox 失败', array('error' => $e->getMessage()));
                 }
             }
+            
+            $outputDebugHeader();
             
             // 3. 清除所有输出缓冲，包括 Typecho 的输出缓冲回调
             // 使用 ob_end_clean() 清除，这样回调不会被触发
