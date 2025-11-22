@@ -329,14 +329,37 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 }
             }
             
-            // 2. 禁用自动发送响应头
+            // 2. 清空 Response 对象的响应头设置，防止 Content-Type 被覆盖
+            // 即使 sandbox 模式启用，如果 Response 对象中有响应头设置，仍然可能被发送
+            if ($realResponse) {
+                try {
+                    $responseReflection = new ReflectionClass($realResponse);
+                    // 清空 headers
+                    if ($responseReflection->hasProperty('headers')) {
+                        $headersProp = $responseReflection->getProperty('headers');
+                        $headersProp->setAccessible(true);
+                        $headersProp->setValue($realResponse, array());
+                    }
+                    // 清空 contentType
+                    if ($responseReflection->hasProperty('contentType')) {
+                        $contentTypeProp = $responseReflection->getProperty('contentType');
+                        $contentTypeProp->setAccessible(true);
+                        $contentTypeProp->setValue($realResponse, null);
+                    }
+                    $addStep('Response 对象的响应头已清空');
+                } catch (Exception $e) {
+                    $addStep('警告: 清空响应头失败', array('error' => $e->getMessage()));
+                }
+            }
+            
+            // 3. 禁用自动发送响应头
             if ($realResponse && method_exists($realResponse, 'enableAutoSendHeaders')) {
                 $realResponse->enableAutoSendHeaders(false);
             } else if (method_exists($this->response, 'enableAutoSendHeaders')) {
                 $this->response->enableAutoSendHeaders(false);
             }
             
-            // 3. 启用 sandbox 模式，完全禁用 Response 对象的响应头发送
+            // 4. 启用 sandbox 模式，完全禁用 Response 对象的响应头发送
             // 这是最关键的：sandbox 模式下，sendHeaders() 会直接返回，不会发送任何响应头
             if ($realResponse && method_exists($realResponse, 'beginSandbox')) {
                 $realResponse->beginSandbox();
@@ -364,26 +387,81 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             // 3. 清除所有输出缓冲，包括 Typecho 的输出缓冲回调
             // 使用 ob_end_clean() 清除，这样回调不会被触发
             $obLevel = ob_get_level();
+            $addStep('清除输出缓冲', array('obLevel' => $obLevel));
             for ($i = 0; $i < $obLevel; $i++) {
                 ob_end_clean();
             }
             
-            // 4. 注册 shutdown 函数，确保 Typecho 的响应处理不会被触发
-            // 这必须在清除输出缓冲之后、调用 show() 之前
-            register_shutdown_function(function() {
-                // 这个函数会在脚本结束时被调用
-                // 但由于 show() 会 exit()，这个函数实际上不会被调用
-                // 这只是为了确保如果 show() 没有 exit()，Typecho 的响应处理也不会被触发
-            });
+            // 4. 确保响应头不会被提前发送
+            // 如果响应头已经被发送，show() 的输出可能会失败
+            if (headers_sent($file, $line)) {
+                restore_error_handler();
+                $addStep('错误: 响应头已被发送', array('file' => $file, 'line' => $line));
+                $outputDebugHeader();
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(array(
+                    'success' => false,
+                    'error' => '响应头已被发送: ' . $file . ':' . $line,
+                    'debug' => $debugInfo
+                ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                exit;
+            }
             
-            // 5. 直接调用 show()，让它自己处理所有事情
-            // show() 会设置响应头、输出图片并 exit()
+            // 5. 记录调用 show() 前的最终状态
+            $addStep('准备调用 show()', array(
+                'obLevel' => ob_get_level(),
+                'headersSent' => headers_sent(),
+                'sandboxEnabled' => $realResponse ? (function() use ($realResponse) {
+                    try {
+                        $reflection = new ReflectionClass($realResponse);
+                        if ($reflection->hasProperty('sandbox')) {
+                            $prop = $reflection->getProperty('sandbox');
+                            $prop->setAccessible(true);
+                            return $prop->getValue($realResponse);
+                        }
+                    } catch (Exception $e) {
+                        return null;
+                    }
+                    return null;
+                })() : null
+            ));
+            $outputDebugHeader();
+            
+            // 6. 直接调用 show()，让它自己处理所有事情
+            // 关键：show() 会立即设置响应头并输出图片，然后 exit()
+            // 由于 sandbox 模式已启用，Typecho 的 sendHeaders() 不会发送响应头
             // 由于输出缓冲已被清除，show() 的输出会直接发送到浏览器
+            // 由于 exit()，Typecho 的响应处理机制不会被触发
+            // show() 会设置响应头、输出图片并 exit()
+            // 由于输出缓冲已被清除且禁用，show() 的输出会直接发送到浏览器
             // 由于 exit()，Typecho 的响应处理机制不会被触发
             restore_error_handler(); // 恢复错误处理，避免干扰 show()
             
             // 调用 show()，它会 exit()
             // 注意：show() 内部会调用 output()，output() 会设置响应头并 exit()
+            // 关键：在调用 show() 之前，确保不会有任何输出或响应头发送
+            // 如果输出缓冲回调在 show() 输出之前被触发，即使 sandbox 模式启用，
+            // Response 对象中可能仍然有默认的 Content-Type 设置
+            
+            // 最后检查：确认 sandbox 模式确实已启用
+            if ($realResponse) {
+                try {
+                    $reflection = new ReflectionClass($realResponse);
+                    if ($reflection->hasProperty('sandbox')) {
+                        $sandboxProp = $reflection->getProperty('sandbox');
+                        $sandboxProp->setAccessible(true);
+                        $sandboxValue = $sandboxProp->getValue($realResponse);
+                        if (!$sandboxValue) {
+                            // 如果 sandbox 模式没有启用，强制启用
+                            $sandboxProp->setValue($realResponse, true);
+                            $addStep('警告: Sandbox 模式未启用，已强制启用');
+                        }
+                    }
+                } catch (Exception $e) {
+                    // 忽略错误
+                }
+            }
+            
             $img->show('');
             
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
