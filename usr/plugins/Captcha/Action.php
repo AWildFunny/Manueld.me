@@ -178,23 +178,90 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         $img->image_height = max(100, $imageHeight); // 最小100px高度，字体约为40px
         $img->image_width = max(250, $imageWidth); // 最小250px宽度，确保有足够空间
 
+        // 检查字体文件
+        $fontFile = $img->ttf_file;
+        $fontExists = file_exists($fontFile);
+        $fontReadable = $fontExists && is_readable($fontFile);
+        
         $addStep('验证码配置完成', array(
-            'fontFile' => $img->ttf_file,
-            'fontExists' => file_exists($img->ttf_file),
+            'fontFile' => $fontFile,
+            'fontExists' => $fontExists,
+            'fontReadable' => $fontReadable,
             'imageWidth' => $img->image_width,
-            'imageHeight' => $img->image_height
+            'imageHeight' => $img->image_height,
+            'gdInfo' => function_exists('gd_info') ? gd_info() : 'GD 扩展未安装'
         ));
         
+        // 检查 GD 库
+        if (!function_exists('imagecreate')) {
+            $addStep('错误: GD 库 imagecreate 函数不存在');
+            $outputDebugHeader();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'error' => 'GD 库 imagecreate 函数不存在',
+                'debug' => $debugInfo
+            ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+        
+        // 检查字体文件
+        if (!$fontExists) {
+            $addStep('错误: 字体文件不存在', array('fontFile' => $fontFile));
+            $outputDebugHeader();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'error' => '字体文件不存在: ' . $fontFile,
+                'debug' => $debugInfo
+            ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+        
+        if (!$fontReadable) {
+            $addStep('错误: 字体文件不可读', array('fontFile' => $fontFile));
+            $outputDebugHeader();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'error' => '字体文件不可读: ' . $fontFile,
+                'debug' => $debugInfo
+            ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+        
         // 在输出图片前，先输出调试信息到响应头
+        $addStep('准备调用 $img->show()');
+        
+        // 设置错误处理，捕获可能的警告
+        $oldErrorHandler = set_error_handler(function($errno, $errstr, $errfile, $errline) use (&$debugInfo, &$addStep) {
+            $addStep('PHP 警告/错误', array(
+                'errno' => $errno,
+                'errstr' => $errstr,
+                'errfile' => $errfile,
+                'errline' => $errline
+            ));
+            return false; // 继续执行默认错误处理
+        });
+        
+        // 清除输出缓冲，确保图片能正常输出
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        // 输出调试信息到响应头（在清除输出缓冲之后）
         $outputDebugHeader();
         
         try {
             $addStep('开始调用 $img->show()');
+            // 注意：$img->show() 内部会调用 exit()，所以后面的代码不会执行
             $img->show('');
-            $addStep('图片输出完成');
-            // 图片输出后再次输出调试信息（虽然可能不会被执行到）
+            // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
+            restore_error_handler();
+            $addStep('警告: $img->show() 执行完成但未退出');
             $outputDebugHeader();
         } catch (Exception $e) {
+            restore_error_handler();
             $addStep('错误: 输出图片失败', array(
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -209,6 +276,7 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             exit;
         } catch (\Throwable $e) {
+            restore_error_handler();
             $addStep('错误: 输出图片失败 (Throwable)', array(
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
