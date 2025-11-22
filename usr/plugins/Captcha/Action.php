@@ -267,18 +267,84 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         
         // 在调用 show() 之前，先输出调试信息（因为 show() 会立即 exit）
         $addStep('开始调用 $img->show()');
+        
+        // 检查关键属性
+        $addStep('检查图片属性', array(
+            'imageWidth' => $img->image_width,
+            'imageHeight' => $img->image_height,
+            'imageType' => $img->image_type,
+            'ttfFile' => $img->ttf_file,
+            'ttfFileExists' => file_exists($img->ttf_file),
+            'ttfFileReadable' => is_readable($img->ttf_file)
+        ));
+        
+        // 测试 GD 库是否能正常创建图片
+        $testImg = @imagecreate(10, 10);
+        if ($testImg === false) {
+            $addStep('错误: GD 库无法创建图片资源');
+            $outputDebugHeader();
+            restore_error_handler();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'error' => 'GD 库无法创建图片资源',
+                'debug' => $debugInfo
+            ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        } else {
+            imagedestroy($testImg);
+            $addStep('GD 库测试通过，可以创建图片资源');
+        }
+        
         $outputDebugHeader();
         
         // 立即调用 $img->show()，避免 Typecho 的响应处理介入
         try {
             // 注意：$img->show() 内部会调用 exit()，所以后面的代码不会执行
             // 直接调用，不等待任何其他处理
-            $img->show('');
-            // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
-            restore_error_handler();
-            $addStep('警告: $img->show() 执行完成但未退出');
+            
+            // 使用反射来检查 show() 方法是否存在
+            $reflection = new ReflectionClass($img);
+            if (!$reflection->hasMethod('show')) {
+                throw new Exception('securimage 对象没有 show() 方法');
+            }
+            
+            $addStep('确认 show() 方法存在，开始调用');
             $outputDebugHeader();
-            exit;
+            
+            // 尝试使用反射直接调用 doImage() 方法，以便更好地控制输出
+            // 但首先检查 doImage() 是否是 protected
+            $reflection = new ReflectionClass($img);
+            if ($reflection->hasMethod('doImage')) {
+                $doImageMethod = $reflection->getMethod('doImage');
+                $doImageMethod->setAccessible(true);
+                
+                $addStep('使用反射调用 doImage() 方法');
+                $outputDebugHeader();
+                
+                // 调用 doImage()，它会调用 output() 并 exit()
+                $doImageMethod->invoke($img);
+                
+                // 如果执行到这里，说明 doImage() 没有正常退出
+                restore_error_handler();
+                $addStep('警告: doImage() 执行完成但未退出');
+                $outputDebugHeader();
+                exit;
+            } else {
+                // 如果没有 doImage() 方法，使用 show() 方法
+                $addStep('使用 show() 方法');
+                $outputDebugHeader();
+                
+                // 调用 show() 方法
+                // 注意：show() 会调用 doImage()，doImage() 会调用 output()，output() 会 exit()
+                $img->show('');
+                
+                // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
+                restore_error_handler();
+                $addStep('警告: $img->show() 执行完成但未退出');
+                $outputDebugHeader();
+                exit;
+            }
         } catch (Exception $e) {
             restore_error_handler();
             $addStep('错误: 输出图片失败', array(
