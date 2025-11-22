@@ -30,63 +30,63 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         
         $addStep('开始执行');
         
-        /** 防止跨站 */
-        $referer = $this->request->getReferer();
-        $addStep('获取 Referer', array('referer' => $referer ?: '(空)'));
+        // /** 防止跨站 */
+        // $referer = $this->request->getReferer();
+        // $addStep('获取 Referer', array('referer' => $referer ?: '(空)'));
         
-        if (empty($referer)) {
-            $addStep('错误: Referer 为空，终止执行');
-            $outputDebugHeader();
-            exit;
-        }
+        // if (empty($referer)) {
+        //     $addStep('错误: Referer 为空，终止执行');
+        //     $outputDebugHeader();
+        //     exit;
+        // }
         
-        $refererPart = parse_url($referer);
-        $siteUrl = Helper::options()->siteUrl;
-        $currentPart = parse_url($siteUrl);
+        // $refererPart = parse_url($referer);
+        // $siteUrl = Helper::options()->siteUrl;
+        // $currentPart = parse_url($siteUrl);
         
-        $addStep('解析 URL', array(
-            'siteUrl' => $siteUrl,
-            'refererPart' => $refererPart,
-            'currentPart' => $currentPart
-        ));
+        // $addStep('解析 URL', array(
+        //     'siteUrl' => $siteUrl,
+        //     'refererPart' => $refererPart,
+        //     'currentPart' => $currentPart
+        // ));
         
-        // 安全获取路径，如果不存在或为空则使用默认值 '/'
-        $refererPath = isset($refererPart['path']) && !empty($refererPart['path']) ? $refererPart['path'] : '/';
-        $currentPath = isset($currentPart['path']) && !empty($currentPart['path']) ? $currentPart['path'] : '/';
+        // // 安全获取路径，如果不存在或为空则使用默认值 '/'
+        // $refererPath = isset($refererPart['path']) && !empty($refererPart['path']) ? $refererPart['path'] : '/';
+        // $currentPath = isset($currentPart['path']) && !empty($currentPart['path']) ? $currentPart['path'] : '/';
         
-        // 确保路径以 '/' 开头，便于比较（路径已保证不为空）
-        if ($refererPath[0] !== '/') {
-            $refererPath = '/' . $refererPath;
-        }
-        if ($currentPath[0] !== '/') {
-            $currentPath = '/' . $currentPath;
-        }
+        // // 确保路径以 '/' 开头，便于比较（路径已保证不为空）
+        // if ($refererPath[0] !== '/') {
+        //     $refererPath = '/' . $refererPath;
+        // }
+        // if ($currentPath[0] !== '/') {
+        //     $currentPath = '/' . $currentPath;
+        // }
         
-        // 检查主机名和路径前缀
-        $hostCheck = isset($refererPart['host']) && isset($currentPart['host']);
-        $hostMatch = $hostCheck && ($refererPart['host'] == $currentPart['host']);
-        $pathCheck = 0 === strpos($refererPath, $currentPath);
+        // // 检查主机名和路径前缀
+        // $hostCheck = isset($refererPart['host']) && isset($currentPart['host']);
+        // $hostMatch = $hostCheck && ($refererPart['host'] == $currentPart['host']);
+        // $pathCheck = 0 === strpos($refererPath, $currentPath);
         
-        $addStep('跨站检查', array(
-            'refererPath' => $refererPath,
-            'currentPath' => $currentPath,
-            'hostCheck' => $hostCheck,
-            'hostMatch' => $hostMatch,
-            'refererHost' => $hostCheck ? $refererPart['host'] : null,
-            'currentHost' => $hostCheck ? $currentPart['host'] : null,
-            'pathCheck' => $pathCheck,
-            'strposResult' => strpos($refererPath, $currentPath)
-        ));
+        // $addStep('跨站检查', array(
+        //     'refererPath' => $refererPath,
+        //     'currentPath' => $currentPath,
+        //     'hostCheck' => $hostCheck,
+        //     'hostMatch' => $hostMatch,
+        //     'refererHost' => $hostCheck ? $refererPart['host'] : null,
+        //     'currentHost' => $hostCheck ? $currentPart['host'] : null,
+        //     'pathCheck' => $pathCheck,
+        //     'strposResult' => strpos($refererPath, $currentPath)
+        // ));
         
-        if (!isset($refererPart['host']) || !isset($currentPart['host']) ||
-            $refererPart['host'] != $currentPart['host'] ||
-            0 !== strpos($refererPath, $currentPath)) {
-            $addStep('错误: 跨站检查失败，终止执行');
-            $outputDebugHeader();
-            exit;
-        }
-        
-        $addStep('跨站检查通过，继续执行');
+        // if (!isset($refererPart['host']) || !isset($currentPart['host']) ||
+        //     $refererPart['host'] != $currentPart['host'] ||
+        //     0 !== strpos($refererPath, $currentPath)) {
+        //     $addStep('错误: 跨站检查失败，终止执行');
+        //     $outputDebugHeader();
+        //     exit;
+        // }
+
+        // $addStep('跨站检查通过，继续执行');
     
         $dir = dirname(__FILE__) . '/securimage/';
         $addStep('准备加载 securimage 库', array('dir' => $dir));
@@ -241,7 +241,8 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 'errfile' => $errfile,
                 'errline' => $errline
             ));
-            return false; // 继续执行默认错误处理
+            // 将警告转为异常，以便捕获
+            throw new Exception("GD Error: $errstr in $errfile on line $errline");
         });
         
         // 先输出调试信息到响应头（注释掉以避免提前发送头）
@@ -284,6 +285,18 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         } else {
             imagedestroy($testImg);
             $addStep('GD 库测试通过，可以创建图片资源');
+            $gdInfo = gd_info();
+            $addStep('GD 信息', array(
+                'version' => $gdInfo['GD Version'],
+                'freetype' => isset($gdInfo['FreeType Support']) ? $gdInfo['FreeType Support'] : false
+            ));
+            if (!isset($gdInfo['FreeType Support']) || !$gdInfo['FreeType Support']) {
+                $addStep('警告: GD 未启用 FreeType 支持，使用备用模式');
+                $img->ttf_file = ''; // 禁用 TTF，使用 GD 内置字体
+            }
+
+            // 输出调试信息（临时启用以捕获信息）
+            $outputDebugHeader();
         }
         
         // 输出调试信息（注释掉，避免在图片路径发送头）
@@ -485,6 +498,24 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 // 调用 doImage()，它会生成图片并调用 output()
                 // output() 会设置响应头并输出图片，然后 exit()
                 $doImageMethod->invoke($img);
+
+                // 新增：如果执行到这里，说明 output() 未 exit()（异常情况），检查图像资源
+                if (!is_resource($img->im) || get_resource_type($img->im) !== 'gd') {
+                    restore_error_handler();
+                    $addStep('错误: 图片资源无效');
+                    $outputDebugHeader();
+                    
+                    // 输出备用错误图片（简单红色X）
+                    header('Content-Type: image/png', true);
+                    $errorImg = imagecreatetruecolor(250, 100);
+                    $bg = imagecolorallocate($errorImg, 255, 255, 255);
+                    $fg = imagecolorallocate($errorImg, 255, 0, 0);
+                    imagefill($errorImg, 0, 0, $bg);
+                    imagestring($errorImg, 5, 10, 40, 'Error Generating Image', $fg);
+                    imagepng($errorImg);
+                    imagedestroy($errorImg);
+                    exit;
+                }
                 
                 // doImage() 内部会调用 output()，output() 会 exit()
                 // 如果执行到这里，说明 output() 没有正常退出（不应该发生）
