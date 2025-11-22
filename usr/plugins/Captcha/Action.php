@@ -302,136 +302,28 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $addStep('确认 show() 方法存在，开始调用');
             $outputDebugHeader();
             
-            // 清除所有输出缓冲，避免 Typecho 的输出缓冲回调干扰图片输出
-            $obLevel = ob_get_level();
-            for ($i = 0; $i < $obLevel; $i++) {
+            // 关键：完全禁用 Typecho 的响应处理机制
+            // 1. 禁用自动发送响应头
+            if (method_exists($this->response, 'enableAutoSendHeaders')) {
+                $this->response->enableAutoSendHeaders(false);
+            }
+            
+            // 2. 清除所有输出缓冲，包括 Typecho 的输出缓冲回调
+            // 这样 show() 的输出就不会被 Typecho 处理
+            while (ob_get_level() > 0) {
                 ob_end_clean();
             }
             
-            // 使用反射直接调用 doImage() 的各个步骤，但不调用 output()
-            // 这样可以完全控制输出过程，避免 Typecho 的响应处理机制干扰
-            $reflection = new ReflectionClass($img);
+            // 3. 直接调用 show()，让它自己处理所有事情
+            // show() 会设置响应头、输出图片并 exit()
+            // 由于输出缓冲已被清除，show() 的输出会直接发送到浏览器
+            // 由于 exit()，Typecho 的响应处理机制不会被触发
+            restore_error_handler(); // 恢复错误处理，避免干扰 show()
+            $img->show('');
             
-            $addStep('开始生成图片');
+            // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
+            $addStep('警告: $img->show() 执行完成但未退出');
             $outputDebugHeader();
-            
-            // 手动执行 doImage() 的各个步骤
-            // 1. 创建图片资源
-            // 使用反射访问 protected 属性
-            $useTransparentTextProp = $reflection->getProperty('use_transparent_text');
-            $useTransparentTextProp->setAccessible(true);
-            $useTransparentText = $useTransparentTextProp->getValue($img);
-            
-            $bgimgProp = $reflection->getProperty('bgimg');
-            $bgimgProp->setAccessible(true);
-            $bgimg = $bgimgProp->getValue($img);
-            
-            if (($useTransparentText == true || $bgimg != '') && function_exists('imagecreatetruecolor')) {
-                $imagecreate = 'imagecreatetruecolor';
-            } else {
-                $imagecreate = 'imagecreate';
-            }
-            
-            $imProp = $reflection->getProperty('im');
-            $imProp->setAccessible(true);
-            $tmpimgProp = $reflection->getProperty('tmpimg');
-            $tmpimgProp->setAccessible(true);
-            $iscaleProp = $reflection->getProperty('iscale');
-            $iscaleProp->setAccessible(true);
-            $iscale = $iscaleProp->getValue($img);
-            
-            $imProp->setValue($img, $imagecreate($img->image_width, $img->image_height));
-            $tmpimgProp->setValue($img, $imagecreate($img->image_width * $iscale, $img->image_height * $iscale));
-            
-            $im = $imProp->getValue($img);
-            $tmpimg = $tmpimgProp->getValue($img);
-            
-            if ($im === false || $tmpimg === false) {
-                restore_error_handler();
-                $addStep('错误: 无法创建图片资源');
-                $outputDebugHeader();
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(array(
-                    'success' => false,
-                    'error' => '无法创建图片资源',
-                    'debug' => $debugInfo
-                ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                exit;
-            }
-            
-            // 2. 分配颜色
-            $allocateColorsMethod = $reflection->getMethod('allocateColors');
-            $allocateColorsMethod->setAccessible(true);
-            $allocateColorsMethod->invoke($img);
-            imagepalettecopy($tmpimg, $im);
-            
-            // 3. 设置背景
-            $setBackgroundMethod = $reflection->getMethod('setBackground');
-            $setBackgroundMethod->setAccessible(true);
-            $setBackgroundMethod->invoke($img);
-            
-            // 4. 创建验证码
-            $createCodeMethod = $reflection->getMethod('createCode');
-            $createCodeMethod->setAccessible(true);
-            $createCodeMethod->invoke($img);
-            
-            // 5. 绘制干扰
-            if ($img->noise_level > 0) {
-                $drawNoiseMethod = $reflection->getMethod('drawNoise');
-                $drawNoiseMethod->setAccessible(true);
-                $drawNoiseMethod->invoke($img);
-            }
-            
-            // 6. 绘制文字
-            $drawWordMethod = $reflection->getMethod('drawWord');
-            $drawWordMethod->setAccessible(true);
-            $drawWordMethod->invoke($img);
-            
-            // 7. 扭曲
-            if ($img->perturbation > 0 && is_readable($img->ttf_file)) {
-                $distortedCopyMethod = $reflection->getMethod('distortedCopy');
-                $distortedCopyMethod->setAccessible(true);
-                $distortedCopyMethod->invoke($img);
-            }
-            
-            // 8. 绘制干扰线
-            if ($img->num_lines > 0) {
-                $drawLinesMethod = $reflection->getMethod('drawLines');
-                $drawLinesMethod->setAccessible(true);
-                $drawLinesMethod->invoke($img);
-            }
-            
-            // 9. 添加签名
-            if (trim($img->image_signature) != '') {
-                $addSignatureMethod = $reflection->getMethod('addSignature');
-                $addSignatureMethod->setAccessible(true);
-                $addSignatureMethod->invoke($img);
-            }
-            
-            // 10. 手动输出图片，完全绕过 Typecho 的响应处理
-            $addStep('手动输出图片');
-            $outputDebugHeader();
-            
-            // 获取最终的图片资源（可能在 distortedCopy 中被修改）
-            $finalIm = $imProp->getValue($img);
-            
-            // 设置图片响应头
-            header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
-            header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-            header('Cache-Control: no-store, no-cache, must-revalidate');
-            header('Cache-Control: post-check=0, pre-check=0', false);
-            header('Pragma: no-cache');
-            header('Content-Type: image/png', true);
-            
-            // 输出图片
-            imagepng($finalIm);
-            imagedestroy($finalIm);
-            if ($tmpimg !== $finalIm) {
-                imagedestroy($tmpimg);
-            }
-            
-            // 直接退出，避免 Typecho 的响应处理机制
-            restore_error_handler();
             exit;
             
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
