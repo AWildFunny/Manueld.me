@@ -497,23 +497,32 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 
                 // 调用 doImage()，它会生成图片并调用 output()
                 // output() 会设置响应头并输出图片，然后 exit()
-                $doImageMethod->invoke($img);
 
-                // 新增：如果执行到这里，说明 output() 未 exit()（异常情况），检查图像资源
-                if (!is_resource($img->im) || get_resource_type($img->im) !== 'gd') {
+                // 新增：启动输出缓冲捕获 doImage 的输出
+                ob_start();
+                $doImageMethod->invoke($img);
+                $generatedOutput = ob_get_contents();
+                ob_end_clean();
+
+                // 检查捕获的输出是否为空
+                if (empty($generatedOutput)) {
                     restore_error_handler();
-                    $addStep('错误: 图片资源无效');
+                    $addStep('错误: 图片生成无输出');
                     $outputDebugHeader();
                     
-                    // 输出备用错误图片（简单红色X）
+                    // 输出备用错误图片
                     header('Content-Type: image/png', true);
                     $errorImg = imagecreatetruecolor(250, 100);
                     $bg = imagecolorallocate($errorImg, 255, 255, 255);
                     $fg = imagecolorallocate($errorImg, 255, 0, 0);
                     imagefill($errorImg, 0, 0, $bg);
-                    imagestring($errorImg, 5, 10, 40, 'Error Generating Image', $fg);
+                    imagestring($errorImg, 5, 10, 40, 'No Image Output', $fg);
                     imagepng($errorImg);
                     imagedestroy($errorImg);
+                    exit;
+                } else {
+                    // 如果有输出，直接 echo 并 exit
+                    echo $generatedOutput;
                     exit;
                 }
                 
