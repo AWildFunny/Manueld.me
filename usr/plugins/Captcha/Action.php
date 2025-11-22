@@ -244,16 +244,16 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             return false; // 继续执行默认错误处理
         });
         
-        // 先输出调试信息到响应头
-        $outputDebugHeader();
+        // 先输出调试信息到响应头（注释掉以避免提前发送头）
+        // $outputDebugHeader();
         
         // 禁用 Typecho 的自动响应处理（如果可能）
         if (method_exists($this->response, 'enableAutoSendHeaders')) {
             $this->response->enableAutoSendHeaders(false);
         }
         
-        // 在调用 show() 之前，先输出调试信息（因为 show() 会立即 exit）
-        $addStep('开始调用 $img->show()');
+        // 在调用 show() 之前，先输出调试信息（因为 show() 会立即 exit）（注释掉）
+        // $addStep('开始调用 $img->show()');
         
         // 注意：不清除输出缓冲，让 show() 方法自己处理
         // show() 内部的 output() 方法会设置正确的响应头并输出图片
@@ -286,7 +286,8 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $addStep('GD 库测试通过，可以创建图片资源');
         }
         
-        $outputDebugHeader();
+        // 输出调试信息（注释掉，避免在图片路径发送头）
+        // $outputDebugHeader();
         
         // 立即调用 $img->show()，避免 Typecho 的响应处理介入
         try {
@@ -300,7 +301,8 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             }
             
             $addStep('确认 show() 方法存在，开始调用');
-            $outputDebugHeader();
+            // 输出调试信息（注释掉）
+            // $outputDebugHeader();
             
             // 关键：完全禁用 Typecho 的响应处理机制
             // 注意：$this->response 是 Typecho\Widget\Response 包装类
@@ -382,15 +384,25 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 }
             }
             
-            $outputDebugHeader();
+            // 注意：在清除输出缓冲之前，先记录状态，但不调用 outputDebugHeader()
+            // 因为 outputDebugHeader() 会调用 header()，可能导致响应头被提前发送
+            $addStep('Sandbox 模式设置完成，准备清除输出缓冲');
             
             // 3. 清除所有输出缓冲，包括 Typecho 的输出缓冲回调
             // 使用 ob_end_clean() 清除，这样回调不会被触发
-            $obLevel = ob_get_level();
-            $addStep('清除输出缓冲', array('obLevel' => $obLevel));
-            for ($i = 0; $i < $obLevel; $i++) {
-                ob_end_clean();
+            try {
+                $obLevel = ob_get_level();
+                $addStep('清除输出缓冲', array('obLevel' => $obLevel));
+                for ($i = 0; $i < $obLevel; $i++) {
+                    ob_end_clean();
+                }
+                $addStep('输出缓冲清除完成');
+            } catch (Exception $e) {
+                $addStep('警告: 清除输出缓冲时发生异常', array('error' => $e->getMessage()));
             }
+            
+            // 新增：清除后立即强制设置Content-Type，覆盖任何可能由回调设置的头
+            header('Content-Type: image/png', true);
             
             // 4. 确保响应头不会被提前发送
             // 如果响应头已经被发送，show() 的输出可能会失败
