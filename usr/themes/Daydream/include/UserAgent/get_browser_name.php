@@ -24,7 +24,7 @@
 function get_browser_version($ua, $title) {
     // Grab the browser version if it's present
     preg_match('/' . $title . '[\ |\/|\:]?([.0-9a-zA-Z]+)/i', $ua, $regmatch);
-    $version = (is_null($regmatch[1])) ? '' : $regmatch[1];
+    $version = (isset($regmatch[1]) && !empty($regmatch[1])) ? $regmatch[1] : '';
     return $version;
 }
 
