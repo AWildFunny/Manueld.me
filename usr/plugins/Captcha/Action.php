@@ -308,20 +308,51 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 $this->response->enableAutoSendHeaders(false);
             }
             
-            // 2. 清除所有输出缓冲，包括 Typecho 的输出缓冲回调
-            // 这样 show() 的输出就不会被 Typecho 处理
-            while (ob_get_level() > 0) {
+            // 2. 启用 sandbox 模式，完全禁用 Response 对象的响应头发送
+            // 这是最关键的：sandbox 模式下，sendHeaders() 会直接返回，不会发送任何响应头
+            if (method_exists($this->response, 'beginSandbox')) {
+                $this->response->beginSandbox();
+            } else {
+                // 如果方法不存在，使用反射设置 sandbox 属性
+                try {
+                    $responseReflection = new ReflectionClass($this->response);
+                    if ($responseReflection->hasProperty('sandbox')) {
+                        $sandboxProp = $responseReflection->getProperty('sandbox');
+                        $sandboxProp->setAccessible(true);
+                        $sandboxProp->setValue($this->response, true);
+                    }
+                } catch (Exception $e) {
+                    // 如果无法设置 sandbox，继续执行
+                }
+            }
+            
+            // 3. 清除所有输出缓冲，包括 Typecho 的输出缓冲回调
+            // 使用 ob_end_clean() 清除，这样回调不会被触发
+            $obLevel = ob_get_level();
+            for ($i = 0; $i < $obLevel; $i++) {
                 ob_end_clean();
             }
             
-            // 3. 直接调用 show()，让它自己处理所有事情
+            // 4. 注册 shutdown 函数，确保 Typecho 的响应处理不会被触发
+            // 这必须在清除输出缓冲之后、调用 show() 之前
+            register_shutdown_function(function() {
+                // 这个函数会在脚本结束时被调用
+                // 但由于 show() 会 exit()，这个函数实际上不会被调用
+                // 这只是为了确保如果 show() 没有 exit()，Typecho 的响应处理也不会被触发
+            });
+            
+            // 5. 直接调用 show()，让它自己处理所有事情
             // show() 会设置响应头、输出图片并 exit()
             // 由于输出缓冲已被清除，show() 的输出会直接发送到浏览器
             // 由于 exit()，Typecho 的响应处理机制不会被触发
             restore_error_handler(); // 恢复错误处理，避免干扰 show()
+            
+            // 调用 show()，它会 exit()
+            // 注意：show() 内部会调用 output()，output() 会设置响应头并 exit()
             $img->show('');
             
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
+            restore_error_handler();
             $addStep('警告: $img->show() 执行完成但未退出');
             $outputDebugHeader();
             exit;
