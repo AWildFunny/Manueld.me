@@ -302,9 +302,15 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $addStep('确认 show() 方法存在，开始调用');
             $outputDebugHeader();
             
+            // 清除所有输出缓冲，避免 Typecho 的输出缓冲回调干扰图片输出
+            // 必须在调用 show() 之前清除，因为 show() 会立即输出图片并 exit()
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             // 直接调用 show() 方法，让它正常执行
             // 注意：show() 会调用 doImage()，doImage() 会调用 output()，output() 会 exit()
-            // 不要在调用前清除输出缓冲，让 securimage 自己处理
+            // output() 方法会设置正确的响应头并输出图片
             $img->show('');
             
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
