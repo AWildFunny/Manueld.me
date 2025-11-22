@@ -261,6 +261,25 @@
             var isVerifying = false;
             var formSubmitHandlerRemoved = false; // 标记是否已移除事件监听器
             
+            // 初始化图片加载监听器
+            console.log('[CAPTCHA] 初始化验证码图片监听器');
+            console.log('[CAPTCHA] 图片元素:', captchaImage);
+            console.log('[CAPTCHA] 初始图片 URL:', captchaImage ? captchaImage.src : '(未找到)');
+            
+            if (captchaImage) {
+                // 监听初始加载
+                captchaImage.addEventListener('load', function() {
+                    console.log('[CAPTCHA] ✅ 初始图片加载成功');
+                    console.log('[CAPTCHA] 图片尺寸:', captchaImage.naturalWidth + 'x' + captchaImage.naturalHeight);
+                });
+                
+                captchaImage.addEventListener('error', function(e) {
+                    console.error('[CAPTCHA] ❌ 初始图片加载失败');
+                    console.error('[CAPTCHA] 错误事件:', e);
+                    console.error('[CAPTCHA] 失败的 URL:', captchaImage.src);
+                });
+            }
+            
             // 简单对话框元素
             var simpleDialog = document.getElementById('simple-dialog');
             var simpleDialogOverlay = document.getElementById('simple-dialog-overlay');
@@ -286,9 +305,49 @@
             
             // 刷新验证码图片
             function refreshCaptcha() {
-                captchaImage.src = captchaImage.src.split('?')[0] + '?' + Math.random();
+                var oldSrc = captchaImage.src;
+                var newSrc = captchaImage.src.split('?')[0] + '?' + Math.random();
+                console.log('[CAPTCHA] 刷新验证码图片');
+                console.log('[CAPTCHA] 旧 URL:', oldSrc);
+                console.log('[CAPTCHA] 新 URL:', newSrc);
+                
+                // 清除之前的错误状态
                 captchaInput.value = '';
                 captchaError.style.display = 'none';
+                
+                // 添加加载事件监听器
+                captchaImage.onload = function() {
+                    console.log('[CAPTCHA] ✅ 图片加载成功');
+                    console.log('[CAPTCHA] 图片尺寸:', captchaImage.naturalWidth + 'x' + captchaImage.naturalHeight);
+                    console.log('[CAPTCHA] 图片实际显示尺寸:', captchaImage.offsetWidth + 'x' + captchaImage.offsetHeight);
+                };
+                
+                captchaImage.onerror = function(e) {
+                    console.error('[CAPTCHA] ❌ 图片加载失败');
+                    console.error('[CAPTCHA] 错误事件:', e);
+                    console.error('[CAPTCHA] 失败的 URL:', captchaImage.src);
+                    console.error('[CAPTCHA] 图片状态:', {
+                        complete: captchaImage.complete,
+                        naturalWidth: captchaImage.naturalWidth,
+                        naturalHeight: captchaImage.naturalHeight
+                    });
+                };
+                
+                // 设置新的图片源
+                captchaImage.src = newSrc;
+                
+                // 检查图片是否立即加载（可能已缓存）
+                setTimeout(function() {
+                    if (captchaImage.complete) {
+                        if (captchaImage.naturalWidth === 0 || captchaImage.naturalHeight === 0) {
+                            console.warn('[CAPTCHA] ⚠️ 图片加载完成但尺寸为 0，可能是空响应');
+                        } else {
+                            console.log('[CAPTCHA] ✅ 图片已缓存，尺寸:', captchaImage.naturalWidth + 'x' + captchaImage.naturalHeight);
+                        }
+                    } else {
+                        console.log('[CAPTCHA] ⏳ 图片正在加载中...');
+                    }
+                }, 100);
             }
             
             // 显示验证码弹窗
