@@ -425,7 +425,10 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                     return null;
                 })() : null
             ));
-            $outputDebugHeader();
+            
+            // 关键：在调用 show() 之前，不要调用 outputDebugHeader()
+            // 因为 outputDebugHeader() 会调用 header()，可能导致响应头被提前发送
+            // 我们只在出错时才输出调试信息
             
             // 6. 直接调用 show()，让它自己处理所有事情
             // 关键：show() 会立即设置响应头并输出图片，然后 exit()
@@ -463,6 +466,12 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 // 先调用 doImage() 生成图片
                 $doImageMethod = $reflection->getMethod('doImage');
                 $doImageMethod->setAccessible(true);
+                
+                $addStep('开始调用 doImage()（通过反射）');
+                // 注意：不调用 outputDebugHeader()，避免响应头被提前发送
+                
+                // 调用 doImage()，它会生成图片并调用 output()
+                // output() 会设置响应头并输出图片，然后 exit()
                 $doImageMethod->invoke($img);
                 
                 // doImage() 内部会调用 output()，output() 会 exit()
@@ -475,15 +484,36 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 // 如果反射失败，回退到使用 show() 方法
                 restore_error_handler();
                 $addStep('警告: 反射调用失败，回退到 show() 方法', array('error' => $e->getMessage()));
+                $outputDebugHeader();
                 
                 // 在调用 show() 之前，先手动设置响应头
                 // 这样可以确保即使输出缓冲回调被触发，响应头也不会被覆盖
                 header('Content-Type: image/png', true);
                 
+                $addStep('开始调用 show() 方法');
+                // 注意：不调用 outputDebugHeader()，避免响应头被提前发送
+                
                 // 调用 show()，它会 exit()
                 // show() 内部会调用 doImage() -> output()
                 // output() 会设置响应头（包括 Content-Type: image/png）并输出图片，然后 exit()
                 $img->show('');
+            } catch (Exception $e) {
+                // 捕获所有其他异常
+                restore_error_handler();
+                $addStep('错误: 调用图片生成方法时发生异常', array(
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ));
+                $outputDebugHeader();
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(array(
+                    'success' => false,
+                    'error' => '图片生成失败: ' . $e->getMessage(),
+                    'debug' => $debugInfo
+                ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                exit;
             }
             
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
