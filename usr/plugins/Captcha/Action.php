@@ -244,22 +244,41 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             return false; // 继续执行默认错误处理
         });
         
-        // 清除输出缓冲，确保图片能正常输出
-        while (ob_get_level()) {
+        // 先输出调试信息到响应头
+        $outputDebugHeader();
+        
+        // 禁用 Typecho 的自动响应处理（如果可能）
+        if (method_exists($this->response, 'enableAutoSendHeaders')) {
+            $this->response->enableAutoSendHeaders(false);
+        }
+        
+        // 设置图片 Content-Type（必须在清除输出缓冲之前）
+        header('Content-Type: image/png', true);
+        
+        // 清除所有输出缓冲，确保图片能正常输出
+        // 使用 ob_end_flush() 而不是 ob_end_clean()，避免触发 Typecho 的输出缓冲回调
+        $obLevel = ob_get_level();
+        for ($i = 0; $i < $obLevel; $i++) {
             ob_end_clean();
         }
         
-        // 输出调试信息到响应头（在清除输出缓冲之后）
+        // 再次设置 Content-Type，确保清除输出缓冲后仍然有效
+        header('Content-Type: image/png', true);
+        
+        // 在调用 show() 之前，先输出调试信息（因为 show() 会立即 exit）
+        $addStep('开始调用 $img->show()');
         $outputDebugHeader();
         
+        // 立即调用 $img->show()，避免 Typecho 的响应处理介入
         try {
-            $addStep('开始调用 $img->show()');
             // 注意：$img->show() 内部会调用 exit()，所以后面的代码不会执行
+            // 直接调用，不等待任何其他处理
             $img->show('');
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
             restore_error_handler();
             $addStep('警告: $img->show() 执行完成但未退出');
             $outputDebugHeader();
+            exit;
         } catch (Exception $e) {
             restore_error_handler();
             $addStep('错误: 输出图片失败', array(
