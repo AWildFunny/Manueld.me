@@ -4,20 +4,39 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
 {
     public function action()
     {
-        // 调试日志文件路径
-        $debugLog = dirname(__FILE__) . '/debug.log';
-        
-        // 记录调试信息
+        // 调试信息数组（用于输出到响应头）
         $debugInfo = array();
-        $debugInfo[] = '[' . date('Y-m-d H:i:s') . '] CAPTCHA Action 开始执行';
+        $debugInfo['timestamp'] = date('Y-m-d H:i:s');
+        $debugInfo['steps'] = array();
+        
+        // 添加调试步骤的辅助函数
+        $addStep = function($step, $data = null) use (&$debugInfo) {
+            $debugInfo['steps'][] = array(
+                'step' => $step,
+                'data' => $data,
+                'time' => microtime(true)
+            );
+        };
+        
+        // 输出调试信息到响应头的辅助函数
+        $outputDebugHeader = function() use (&$debugInfo) {
+            $debugJson = json_encode($debugInfo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            // 响应头有长度限制，如果太长则截断
+            if (strlen($debugJson) > 8000) {
+                $debugJson = substr($debugJson, 0, 8000) . '...(截断)';
+            }
+            header('X-Captcha-Debug: ' . base64_encode($debugJson));
+        };
+        
+        $addStep('开始执行');
         
         /** 防止跨站 */
         $referer = $this->request->getReferer();
-        $debugInfo[] = 'Referer: ' . ($referer ?: '(空)');
+        $addStep('获取 Referer', array('referer' => $referer ?: '(空)'));
         
         if (empty($referer)) {
-            $debugInfo[] = '错误: Referer 为空，终止执行';
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('错误: Referer 为空，终止执行');
+            $outputDebugHeader();
             exit;
         }
         
@@ -25,16 +44,15 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         $siteUrl = Helper::options()->siteUrl;
         $currentPart = parse_url($siteUrl);
         
-        $debugInfo[] = '站点 URL: ' . $siteUrl;
-        $debugInfo[] = 'Referer 解析: ' . json_encode($refererPart);
-        $debugInfo[] = '站点 URL 解析: ' . json_encode($currentPart);
+        $addStep('解析 URL', array(
+            'siteUrl' => $siteUrl,
+            'refererPart' => $refererPart,
+            'currentPart' => $currentPart
+        ));
         
         // 安全获取路径，如果不存在或为空则使用默认值 '/'
         $refererPath = isset($refererPart['path']) && !empty($refererPart['path']) ? $refererPart['path'] : '/';
         $currentPath = isset($currentPart['path']) && !empty($currentPart['path']) ? $currentPart['path'] : '/';
-        
-        $debugInfo[] = 'Referer 路径: ' . $refererPath;
-        $debugInfo[] = '站点路径: ' . $currentPath;
         
         // 确保路径以 '/' 开头，便于比较（路径已保证不为空）
         if ($refererPath[0] !== '/') {
@@ -44,51 +62,58 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $currentPath = '/' . $currentPath;
         }
         
-        $debugInfo[] = '规范化后的 Referer 路径: ' . $refererPath;
-        $debugInfo[] = '规范化后的站点路径: ' . $currentPath;
-        
         // 检查主机名和路径前缀
         $hostCheck = isset($refererPart['host']) && isset($currentPart['host']);
         $hostMatch = $hostCheck && ($refererPart['host'] == $currentPart['host']);
         $pathCheck = 0 === strpos($refererPath, $currentPath);
         
-        $debugInfo[] = '主机名检查: ' . ($hostCheck ? '通过' : '失败');
-        $debugInfo[] = '主机名匹配: ' . ($hostMatch ? '是' : '否');
-        if ($hostCheck) {
-            $debugInfo[] = 'Referer 主机: ' . $refererPart['host'];
-            $debugInfo[] = '站点主机: ' . $currentPart['host'];
-        }
-        $debugInfo[] = '路径前缀检查: ' . ($pathCheck ? '通过' : '失败');
-        $debugInfo[] = 'strpos 结果: ' . strpos($refererPath, $currentPath);
+        $addStep('跨站检查', array(
+            'refererPath' => $refererPath,
+            'currentPath' => $currentPath,
+            'hostCheck' => $hostCheck,
+            'hostMatch' => $hostMatch,
+            'refererHost' => $hostCheck ? $refererPart['host'] : null,
+            'currentHost' => $hostCheck ? $currentPart['host'] : null,
+            'pathCheck' => $pathCheck,
+            'strposResult' => strpos($refererPath, $currentPath)
+        ));
         
         if (!isset($refererPart['host']) || !isset($currentPart['host']) ||
             $refererPart['host'] != $currentPart['host'] ||
             0 !== strpos($refererPath, $currentPath)) {
-            $debugInfo[] = '错误: 跨站检查失败，终止执行';
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('错误: 跨站检查失败，终止执行');
+            $outputDebugHeader();
             exit;
         }
         
-        $debugInfo[] = '跨站检查通过，继续执行';
+        $addStep('跨站检查通过，继续执行');
     
         $dir = dirname(__FILE__) . '/securimage/';
-        $debugInfo[] = '开始加载 securimage 库，路径: ' . $dir;
+        $addStep('准备加载 securimage 库', array('dir' => $dir));
         
         try {
             require_once dirname(__FILE__) . '/securimage/securimage.php';
-            $debugInfo[] = 'securimage 库加载成功';
+            $addStep('securimage 库加载成功');
         } catch (Exception $e) {
-            $debugInfo[] = '错误: 加载 securimage 库失败 - ' . $e->getMessage();
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('错误: 加载 securimage 库失败', array('error' => $e->getMessage()));
+            $outputDebugHeader();
+            exit;
+        } catch (\Throwable $e) {
+            $addStep('错误: 加载 securimage 库失败 (Throwable)', array('error' => $e->getMessage()));
+            $outputDebugHeader();
             exit;
         }
         
         try {
             $img = new securimage();
-            $debugInfo[] = 'securimage 对象创建成功';
+            $addStep('securimage 对象创建成功');
         } catch (Exception $e) {
-            $debugInfo[] = '错误: 创建 securimage 对象失败 - ' . $e->getMessage();
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('错误: 创建 securimage 对象失败', array('error' => $e->getMessage()));
+            $outputDebugHeader();
+            exit;
+        } catch (\Throwable $e) {
+            $addStep('错误: 创建 securimage 对象失败 (Throwable)', array('error' => $e->getMessage()));
+            $outputDebugHeader();
             exit;
         }
 
@@ -153,25 +178,49 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
         $img->image_height = max(100, $imageHeight); // 最小100px高度，字体约为40px
         $img->image_width = max(250, $imageWidth); // 最小250px宽度，确保有足够空间
 
-        $debugInfo[] = '验证码配置完成，准备输出图片';
-        $debugInfo[] = '字体文件: ' . $img->ttf_file;
-        $debugInfo[] = '图片尺寸: ' . $img->image_width . 'x' . $img->image_height;
+        $addStep('验证码配置完成', array(
+            'fontFile' => $img->ttf_file,
+            'fontExists' => file_exists($img->ttf_file),
+            'imageWidth' => $img->image_width,
+            'imageHeight' => $img->image_height
+        ));
+        
+        // 在输出图片前，先输出调试信息到响应头
+        $outputDebugHeader();
         
         try {
-            $debugInfo[] = '开始调用 $img->show()';
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n", FILE_APPEND);
+            $addStep('开始调用 $img->show()');
             $img->show('');
-            $debugInfo[] = '图片输出完成';
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('图片输出完成');
+            // 图片输出后再次输出调试信息（虽然可能不会被执行到）
+            $outputDebugHeader();
         } catch (Exception $e) {
-            $debugInfo[] = '错误: 输出图片失败 - ' . $e->getMessage();
-            $debugInfo[] = '错误堆栈: ' . $e->getTraceAsString();
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('错误: 输出图片失败', array(
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ));
+            $outputDebugHeader();
+            // 输出 JSON 错误信息而不是图片
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'error' => '图片生成失败: ' . $e->getMessage(),
+                'debug' => $debugInfo
+            ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             exit;
         } catch (\Throwable $e) {
-            $debugInfo[] = '错误: 输出图片失败 (Throwable) - ' . $e->getMessage();
-            $debugInfo[] = '错误堆栈: ' . $e->getTraceAsString();
-            file_put_contents($debugLog, implode("\n", $debugInfo) . "\n\n", FILE_APPEND);
+            $addStep('错误: 输出图片失败 (Throwable)', array(
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ));
+            $outputDebugHeader();
+            // 输出 JSON 错误信息而不是图片
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'error' => '图片生成失败: ' . $e->getMessage(),
+                'debug' => $debugInfo
+            ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             exit;
         }
     }
