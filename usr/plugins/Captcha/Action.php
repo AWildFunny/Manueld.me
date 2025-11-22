@@ -432,16 +432,7 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             // 由于 sandbox 模式已启用，Typecho 的 sendHeaders() 不会发送响应头
             // 由于输出缓冲已被清除，show() 的输出会直接发送到浏览器
             // 由于 exit()，Typecho 的响应处理机制不会被触发
-            // show() 会设置响应头、输出图片并 exit()
-            // 由于输出缓冲已被清除且禁用，show() 的输出会直接发送到浏览器
-            // 由于 exit()，Typecho 的响应处理机制不会被触发
             restore_error_handler(); // 恢复错误处理，避免干扰 show()
-            
-            // 调用 show()，它会 exit()
-            // 注意：show() 内部会调用 output()，output() 会设置响应头并 exit()
-            // 关键：在调用 show() 之前，确保不会有任何输出或响应头发送
-            // 如果输出缓冲回调在 show() 输出之前被触发，即使 sandbox 模式启用，
-            // Response 对象中可能仍然有默认的 Content-Type 设置
             
             // 最后检查：确认 sandbox 模式确实已启用
             if ($realResponse) {
@@ -462,7 +453,38 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
                 }
             }
             
-            $img->show('');
+            // 关键：直接调用 doImage() 和 output()，绕过 show() 的调用链
+            // 这样可以确保响应头设置和输出在同一个执行流程中完成
+            // 注意：doImage() 会生成图片，output() 会设置响应头并输出图片，然后 exit()
+            try {
+                // 使用反射调用 protected 方法
+                $reflection = new ReflectionClass($img);
+                
+                // 先调用 doImage() 生成图片
+                $doImageMethod = $reflection->getMethod('doImage');
+                $doImageMethod->setAccessible(true);
+                $doImageMethod->invoke($img);
+                
+                // doImage() 内部会调用 output()，output() 会 exit()
+                // 如果执行到这里，说明 output() 没有正常退出（不应该发生）
+                restore_error_handler();
+                $addStep('警告: doImage() 执行完成但未退出');
+                $outputDebugHeader();
+                exit;
+            } catch (ReflectionException $e) {
+                // 如果反射失败，回退到使用 show() 方法
+                restore_error_handler();
+                $addStep('警告: 反射调用失败，回退到 show() 方法', array('error' => $e->getMessage()));
+                
+                // 在调用 show() 之前，先手动设置响应头
+                // 这样可以确保即使输出缓冲回调被触发，响应头也不会被覆盖
+                header('Content-Type: image/png', true);
+                
+                // 调用 show()，它会 exit()
+                // show() 内部会调用 doImage() -> output()
+                // output() 会设置响应头（包括 Content-Type: image/png）并输出图片，然后 exit()
+                $img->show('');
+            }
             
             // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
             restore_error_handler();
