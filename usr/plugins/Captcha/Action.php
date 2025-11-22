@@ -317,16 +317,36 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             
             // 手动执行 doImage() 的各个步骤
             // 1. 创建图片资源
-            if (($img->use_transparent_text == true || $img->bgimg != '') && function_exists('imagecreatetruecolor')) {
+            // 使用反射访问 protected 属性
+            $useTransparentTextProp = $reflection->getProperty('use_transparent_text');
+            $useTransparentTextProp->setAccessible(true);
+            $useTransparentText = $useTransparentTextProp->getValue($img);
+            
+            $bgimgProp = $reflection->getProperty('bgimg');
+            $bgimgProp->setAccessible(true);
+            $bgimg = $bgimgProp->getValue($img);
+            
+            if (($useTransparentText == true || $bgimg != '') && function_exists('imagecreatetruecolor')) {
                 $imagecreate = 'imagecreatetruecolor';
             } else {
                 $imagecreate = 'imagecreate';
             }
             
-            $img->im = $imagecreate($img->image_width, $img->image_height);
-            $img->tmpimg = $imagecreate($img->image_width * $img->iscale, $img->image_height * $img->iscale);
+            $imProp = $reflection->getProperty('im');
+            $imProp->setAccessible(true);
+            $tmpimgProp = $reflection->getProperty('tmpimg');
+            $tmpimgProp->setAccessible(true);
+            $iscaleProp = $reflection->getProperty('iscale');
+            $iscaleProp->setAccessible(true);
+            $iscale = $iscaleProp->getValue($img);
             
-            if ($img->im === false || $img->tmpimg === false) {
+            $imProp->setValue($img, $imagecreate($img->image_width, $img->image_height));
+            $tmpimgProp->setValue($img, $imagecreate($img->image_width * $iscale, $img->image_height * $iscale));
+            
+            $im = $imProp->getValue($img);
+            $tmpimg = $tmpimgProp->getValue($img);
+            
+            if ($im === false || $tmpimg === false) {
                 restore_error_handler();
                 $addStep('错误: 无法创建图片资源');
                 $outputDebugHeader();
@@ -343,7 +363,7 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $allocateColorsMethod = $reflection->getMethod('allocateColors');
             $allocateColorsMethod->setAccessible(true);
             $allocateColorsMethod->invoke($img);
-            imagepalettecopy($img->tmpimg, $img->im);
+            imagepalettecopy($tmpimg, $im);
             
             // 3. 设置背景
             $setBackgroundMethod = $reflection->getMethod('setBackground');
@@ -392,6 +412,9 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $addStep('手动输出图片');
             $outputDebugHeader();
             
+            // 获取最终的图片资源（可能在 distortedCopy 中被修改）
+            $finalIm = $imProp->getValue($img);
+            
             // 设置图片响应头
             header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
             header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
@@ -401,8 +424,11 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             header('Content-Type: image/png', true);
             
             // 输出图片
-            imagepng($img->im);
-            imagedestroy($img->im);
+            imagepng($finalIm);
+            imagedestroy($finalIm);
+            if ($tmpimg !== $finalIm) {
+                imagedestroy($tmpimg);
+            }
             
             // 直接退出，避免 Typecho 的响应处理机制
             restore_error_handler();
