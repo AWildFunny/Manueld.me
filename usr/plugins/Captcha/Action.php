@@ -252,21 +252,11 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $this->response->enableAutoSendHeaders(false);
         }
         
-        // 设置图片 Content-Type（必须在清除输出缓冲之前）
-        header('Content-Type: image/png', true);
-        
-        // 清除所有输出缓冲，确保图片能正常输出
-        // 使用 ob_end_flush() 而不是 ob_end_clean()，避免触发 Typecho 的输出缓冲回调
-        $obLevel = ob_get_level();
-        for ($i = 0; $i < $obLevel; $i++) {
-            ob_end_clean();
-        }
-        
-        // 再次设置 Content-Type，确保清除输出缓冲后仍然有效
-        header('Content-Type: image/png', true);
-        
         // 在调用 show() 之前，先输出调试信息（因为 show() 会立即 exit）
         $addStep('开始调用 $img->show()');
+        
+        // 注意：不清除输出缓冲，让 show() 方法自己处理
+        // show() 内部的 output() 方法会设置正确的响应头并输出图片
         
         // 检查关键属性
         $addStep('检查图片属性', array(
@@ -312,134 +302,16 @@ class Captcha_Action extends Typecho_Widget implements Widget_Interface_Do
             $addStep('确认 show() 方法存在，开始调用');
             $outputDebugHeader();
             
-            // 尝试使用反射直接调用 doImage() 方法，以便更好地控制输出
-            // 但首先检查 doImage() 是否是 protected
-            $reflection = new ReflectionClass($img);
-            if ($reflection->hasMethod('doImage')) {
-                $doImageMethod = $reflection->getMethod('doImage');
-                $doImageMethod->setAccessible(true);
-                
-                $addStep('使用反射调用 doImage() 方法');
-                $outputDebugHeader();
-                
-                // 设置更严格的错误处理，捕获所有可能的错误
-                set_error_handler(function($errno, $errstr, $errfile, $errline) use (&$debugInfo, &$addStep, &$outputDebugHeader) {
-                    $addStep('PHP 错误/警告', array(
-                        'errno' => $errno,
-                        'errstr' => $errstr,
-                        'errfile' => basename($errfile),
-                        'errline' => $errline
-                    ));
-                    $outputDebugHeader();
-                    return false; // 继续执行默认错误处理
-                }, E_ALL | E_STRICT);
-                
-                // 在调用 doImage() 之前，先检查关键属性
-                $addStep('调用 doImage() 前的检查', array(
-                    'imageWidth' => $img->image_width,
-                    'imageHeight' => $img->image_height,
-                    'ttfFile' => $img->ttf_file,
-                    'ttfFileExists' => file_exists($img->ttf_file),
-                    'ttfFileReadable' => is_readable($img->ttf_file),
-                    'hasIm' => isset($img->im),
-                    'imIsResource' => isset($img->im) && is_resource($img->im)
-                ));
-                $outputDebugHeader();
-                
-                // 调用 doImage()，它会调用 output() 并 exit()
-                try {
-                    // 使用输出缓冲来捕获可能的输出
-                    ob_start();
-                    $doImageMethod->invoke($img);
-                    $output = ob_get_clean();
-                    
-                    // 如果执行到这里，说明 doImage() 没有正常退出
-                    restore_error_handler();
-                    $addStep('警告: doImage() 执行完成但未退出', array(
-                        'outputLength' => strlen($output),
-                        'outputPreview' => substr($output, 0, 200)
-                    ));
-                    $outputDebugHeader();
-                    
-                    // 检查图片资源是否存在
-                    $hasIm = isset($img->im);
-                    $imIsResource = $hasIm && is_resource($img->im);
-                    
-                    $addStep('检查图片资源', array(
-                        'hasIm' => $hasIm,
-                        'imIsResource' => $imIsResource,
-                        'outputLength' => strlen($output)
-                    ));
-                    $outputDebugHeader();
-                    
-                    // 手动尝试输出图片
-                    if ($imIsResource) {
-                        $addStep('尝试手动输出图片');
-                        $outputDebugHeader();
-                        header('Content-Type: image/png', true);
-                        imagepng($img->im);
-                        imagedestroy($img->im);
-                        exit;
-                    } else {
-                        $addStep('错误: 图片资源不存在或无效', array(
-                            'hasIm' => $hasIm,
-                            'imIsResource' => $imIsResource,
-                            'output' => $output
-                        ));
-                        $outputDebugHeader();
-                        header('Content-Type: application/json; charset=utf-8');
-                        echo json_encode(array(
-                            'success' => false,
-                            'error' => '图片资源不存在或无效',
-                            'output' => $output,
-                            'debug' => $debugInfo
-                        ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                        exit;
-                    }
-                } catch (Exception $e) {
-                    restore_error_handler();
-                    $addStep('错误: doImage() 执行失败', array(
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ));
-                    $outputDebugHeader();
-                    header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(array(
-                        'success' => false,
-                        'error' => 'doImage() 执行失败: ' . $e->getMessage(),
-                        'debug' => $debugInfo
-                    ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                    exit;
-                } catch (\Throwable $e) {
-                    restore_error_handler();
-                    $addStep('错误: doImage() 执行失败 (Throwable)', array(
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ));
-                    $outputDebugHeader();
-                    header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(array(
-                        'success' => false,
-                        'error' => 'doImage() 执行失败: ' . $e->getMessage(),
-                        'debug' => $debugInfo
-                    ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                    exit;
-                }
-            } else {
-                // 如果没有 doImage() 方法，使用 show() 方法
-                $addStep('使用 show() 方法');
-                $outputDebugHeader();
-                
-                // 调用 show() 方法
-                // 注意：show() 会调用 doImage()，doImage() 会调用 output()，output() 会 exit()
-                $img->show('');
-                
-                // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
-                restore_error_handler();
-                $addStep('警告: $img->show() 执行完成但未退出');
-                $outputDebugHeader();
-                exit;
-            }
+            // 直接调用 show() 方法，让它正常执行
+            // 注意：show() 会调用 doImage()，doImage() 会调用 output()，output() 会 exit()
+            // 不要在调用前清除输出缓冲，让 securimage 自己处理
+            $img->show('');
+            
+            // 如果执行到这里，说明 show() 没有正常退出（不应该发生）
+            restore_error_handler();
+            $addStep('警告: $img->show() 执行完成但未退出');
+            $outputDebugHeader();
+            exit;
         } catch (Exception $e) {
             restore_error_handler();
             $addStep('错误: 输出图片失败', array(
