@@ -12,12 +12,6 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
     $this->need('header.php');
 ?>
 
-<?php if ($this->options->notification !=''): ?>
-    <div class="alert">
-        <?php $this->options->notification(); ?>
-    </div>
-<?php endif; ?>
-
 <?php while ($this->next()): ?>
     <section itemscope itemtype="http://schema.org/BlogPosting">
         <?php if ($this->fields->headPic !=''): ?>

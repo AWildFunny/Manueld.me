@@ -362,6 +362,80 @@ nav a:hover { color: var(--secondary-hover); }
 nav a:focus { color: var(--secondary-focus); }
 
 /* 首页摘要里各种标题只用较大的粗体呈现 */
+/* 首页自定义模板样式 */
+.recommended-posts,
+.recent-posts {
+    margin-top: calc(var(--spacing) * 2);
+}
+
+.recommended-posts h2,
+.recent-posts h2 {
+    margin-bottom: calc(var(--spacing) * 1.5);
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 0.5);
+}
+
+.recommended-posts h2 i,
+.recent-posts h2 i {
+    color: var(--primary);
+}
+
+.posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1.5);
+}
+
+.post-item {
+    padding: calc(var(--spacing) * 1);
+    border-left: 3px solid var(--primary);
+    background-color: var(--card-background-color);
+    border-radius: var(--border-radius);
+    transition: all 0.3s ease;
+}
+
+.post-item:hover {
+    box-shadow: var(--card-box-shadow);
+    transform: translateX(4px);
+}
+
+.post-item h3 {
+    margin-top: 0;
+    margin-bottom: calc(var(--spacing) * 0.5);
+}
+
+.post-item h3 a {
+    color: var(--color);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.post-item h3 a:hover {
+    color: var(--primary);
+}
+
+.post-excerpt {
+    color: var(--muted-color);
+    margin-bottom: calc(var(--spacing) * 0.5);
+    line-height: var(--line-height);
+}
+
+.post-meta {
+    font-size: 0.9em;
+    color: var(--muted-color);
+}
+
+.post-meta time {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 0.25);
+}
+
+.page-content {
+    margin-top: calc(var(--spacing) * 2);
+}
+
 .summary h1, .summary h2, .summary h3, .summary h4, .summary h5 {
     --font-size: 1.125rem;
     --typography-spacing-vertical: 0.5rem;

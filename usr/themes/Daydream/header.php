@@ -92,6 +92,40 @@
     <nav class="navbar">
         <div class="navbar-container">
         <?php 
+        // 解析 frontPage 设置
+        $frontPageParts = explode(':', $this->options->frontPage);
+        $frontPageType = $frontPageParts[0];
+        $frontPageValue = count($frontPageParts) > 1 ? $frontPageParts[1] : '';
+        $isPageHomepage = ($frontPageType == 'page');
+        $isFileHomepage = ($frontPageType == 'file');
+        
+        // 获取首页页面链接（如果首页是页面）
+        $homePageUrl = '';
+        if ($isPageHomepage && !empty($frontPageValue)) {
+            // 使用 Widget 获取页面信息，这样可以正确生成 permalink
+            Typecho_Widget::widget('Widget_Contents_Page_List')->to($homePageList);
+            while ($homePageList->next()) {
+                if ($homePageList->cid == intval($frontPageValue)) {
+                    $homePageUrl = $homePageList->permalink;
+                    break;
+                }
+            }
+            // 如果 Widget 中没有找到（因为被排除了），直接查询数据库并使用 Router
+            if (empty($homePageUrl)) {
+                $db = Typecho_Db::get();
+                $homePage = $db->fetchRow($db->select('slug')
+                    ->from('table.contents')
+                    ->where('cid = ?', intval($frontPageValue))
+                    ->where('type = ?', 'page')
+                    ->where('status = ?', 'publish')
+                    ->limit(1));
+                if ($homePage) {
+                    // 使用 Typecho_Router 生成页面链接
+                    $homePageUrl = Typecho_Router::url('page', array('slug' => $homePage['slug']), $this->options->index);
+                }
+            }
+        }
+        
         // 先获取所有页面列表，用于查找"关于"页面和渲染导航栏
         $this->widget('Widget_Contents_Page_List')->to($pagelist);
         
@@ -115,7 +149,7 @@
         
         // 如果没有找到"关于"页面，使用第一个页面或首页
         if (empty($aboutPageUrl)) {
-            $aboutPageUrl = !empty($firstPageUrl) ? $firstPageUrl : $this->options->siteUrl();
+            $aboutPageUrl = !empty($firstPageUrl) ? $firstPageUrl : ($homePageUrl ? $homePageUrl : $this->options->siteUrl());
         }
         
         // 重置页面列表迭代器，重新开始遍历以渲染导航栏
@@ -128,14 +162,35 @@
             <?php if ($this->options->realHomepage): ?>
                 <li><a class="<?php echo ($this->is('index'))?'active':'';?>" href="<?php $this->options->realHomepage();?>"><i class="czs-home"></i> 首页 </a></li>
             <?php endif; ?>
-            <?php if (strpos($this->options->frontPage, 'file') !== FALSE):?>
+            <?php if ($isFileHomepage || $isPageHomepage): ?>
+                <!-- 自定义文件首页或页面首页：显示"首页"和"文章"两个链接 -->
+                <?php
+                // 判断当前是否是首页页面
+                $isHomePageActive = false;
+                if ($isPageHomepage) {
+                    // 检查是否是首页页面：通过 is('index') 或 is('page') 且 cid 匹配
+                    if ($this->is('index') || ($this->is('page') && isset($this->request->cid) && $this->request->cid == intval($frontPageValue))) {
+                        $isHomePageActive = true;
+                    }
+                } else {
+                    // 文件首页：检查是否是 index
+                    $isHomePageActive = $this->is('index');
+                }
+                ?>
                 <li>
-                    <a class="<?php echo ($this->is('index'))?'active':'';?>" href="<?php $this->options->siteUrl();?>"><i class="czs-home"></i> 首页 </a>
+                    <a class="<?php echo $isHomePageActive ? 'active' : '';?>" 
+                       href="<?php echo $isPageHomepage && $homePageUrl ? $homePageUrl : $this->options->siteUrl();?>">
+                        <i class="czs-home"></i> 首页 
+                    </a>
                 </li>
                 <li>
-                    <a class="<?php echo ($this->is('archive') || $this->is('post') || $this->is('category') || $this->is('tag'))?'active':'';?>" href="<?php echo $this->options->siteUrl.$this->options->routingTable['archive']['url']; ?>"><i class="czs-book"></i> 文章 </a>
+                    <a class="<?php echo ($this->is('archive') || $this->is('post') || $this->is('category') || $this->is('tag'))?'active':'';?>" 
+                       href="<?php echo Typecho_Common::url($this->options->routingTable['archive']['url'], $this->options->index); ?>">
+                        <i class="czs-book"></i> 文章 
+                    </a>
                 </li>
             <?php else: ?>
+                <!-- 默认首页（recent）：只显示"博客"链接 -->
                 <li>
                     <a class="<?php echo ($this->is('index'))?'active':'';?>" href="<?php $this->options->siteUrl();?>"><i class="czs-paper"></i> 博客 </a>
                 </li>
@@ -264,8 +319,14 @@
                 link.classList.remove('active');
             });
             
+            // 获取首页页面的 URL（从 PHP 传递）
+            const homePageUrl = <?php echo json_encode($isPageHomepage && $homePageUrl ? $homePageUrl : ''); ?>;
+            const isPageHomepage = <?php echo $isPageHomepage ? 'true' : 'false'; ?>;
+            
             // 判断当前页面类型
-            const isIndex = currentPath === '/' || currentPath === '/index.php';
+            const isIndex = currentPath === '/' || currentPath === '/index.php' || 
+                           currentPath.match(/^\/myblog\/?$/i) || currentPath.match(/^\/myblog\/index\.php$/i);
+            const isHomePage = isPageHomepage && (isIndex || (homePageUrl && pathsMatch(currentUrl, homePageUrl)));
             const isArchive = /\/archives\/\d+/.test(currentPath) || currentPath.includes('/archives/');
             const isCategory = currentPath.includes('/category/');
             const isTag = currentPath.includes('/tag/');
@@ -283,10 +344,15 @@
                 }
                 
                 // 方法2：根据页面类型匹配
-                if (isIndex) {
-                    // 首页：匹配包含"首页"或"博客"的链接，或者链接指向首页
-                    if (linkText.includes('首页') || linkText.includes('博客') || 
-                        pathsMatch(href, '/') || pathsMatch(href, '/index.php')) {
+                if (isHomePage || isIndex) {
+                    // 首页：匹配包含"首页"的链接，或者链接指向首页
+                    if (linkText.includes('首页')) {
+                        link.classList.add('active');
+                        return;
+                    }
+                    // 如果是根路径且没有"首页"链接，匹配"博客"链接（向后兼容）
+                    if (isIndex && !isPageHomepage && (linkText.includes('博客') || 
+                        pathsMatch(href, '/') || pathsMatch(href, '/index.php'))) {
                         link.classList.add('active');
                         return;
                     }
