@@ -195,21 +195,68 @@
         });
     })();
     
-    // 更新导航链接的 active 状态
+    // 更新导航链接的 active 状态 - 重新设计的可靠方案
     (function() {
-        function normalizeUrl(url) {
-            // 移除协议、域名和查询参数，只保留路径
+        let lastUrl = window.location.href;
+        
+        // 规范化 URL，提取路径部分
+        function getPath(url) {
             try {
-                const urlObj = new URL(url, window.location.origin);
-                return urlObj.pathname.replace(/\/$/, '') || '/';
-            } catch (e) {
+                // 如果是完整 URL
+                if (url.indexOf('://') > -1) {
+                    const urlObj = new URL(url);
+                    return urlObj.pathname.replace(/\/$/, '') || '/';
+                }
                 // 如果是相对路径
-                return url.split('?')[0].split('#')[0].replace(/\/$/, '') || '/';
+                const path = url.split('?')[0].split('#')[0];
+                return path.replace(/\/$/, '') || '/';
+            } catch (e) {
+                // 如果解析失败，尝试简单提取
+                const path = url.split('?')[0].split('#')[0];
+                return path.replace(/\/$/, '') || '/';
             }
         }
         
+        // 比较两个路径是否匹配
+        function pathsMatch(path1, path2) {
+            const p1 = getPath(path1);
+            const p2 = getPath(path2);
+            
+            // 完全匹配
+            if (p1 === p2) return true;
+            
+            // 处理首页情况
+            if ((p1 === '/' || p1 === '/index.php') && (p2 === '/' || p2 === '/index.php')) {
+                return true;
+            }
+            
+            // 提取 slug 进行比较（用于独立页面）
+            const getSlug = (path) => {
+                const htmlMatch = path.match(/\/([^\/]+)\.html$/);
+                if (htmlMatch) {
+                    try {
+                        return decodeURIComponent(htmlMatch[1]);
+                    } catch (e) {
+                        return htmlMatch[1];
+                    }
+                }
+                const parts = path.split('/').filter(p => p && p !== 'index.php' && p !== '');
+                return parts.length > 0 ? parts[parts.length - 1] : null;
+            };
+            
+            const slug1 = getSlug(p1);
+            const slug2 = getSlug(p2);
+            if (slug1 && slug2 && slug1 === slug2) {
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // 更新导航高亮
         function updateNavbarActive() {
-            const currentPath = normalizeUrl(window.location.href);
+            const currentUrl = window.location.href;
+            const currentPath = getPath(currentUrl);
             const navLinks = document.querySelectorAll('.navbar a:not(.navbar-avatar-link)');
             
             // 移除所有 active 类
@@ -217,72 +264,95 @@
                 link.classList.remove('active');
             });
             
-            // 获取站点基础 URL
-            const siteUrl = '<?php echo rtrim($this->options->siteUrl(), "/"); ?>';
-            const sitePath = normalizeUrl(siteUrl);
-            
             // 判断当前页面类型
-            const isIndex = currentPath === '/' || currentPath === sitePath || 
-                           currentPath === '/index.php' || currentPath === (sitePath + '/index.php');
-            const isArchive = currentPath.includes('/archives/') || 
-                             currentPath.match(/\/archives\/\d+/); // 文章详情页
+            const isIndex = currentPath === '/' || currentPath === '/index.php';
+            const isArchive = /\/archives\/\d+/.test(currentPath) || currentPath.includes('/archives/');
             const isCategory = currentPath.includes('/category/');
             const isTag = currentPath.includes('/tag/');
-            const isBlogArchive = currentPath.includes('/blog/') || currentPath.includes('/blog');
+            const isBlogArchive = currentPath.includes('/blog');
             
-            // 应用高亮
+            // 遍历所有导航链接，找到匹配的
             navLinks.forEach(link => {
                 const href = link.getAttribute('href') || '';
-                const linkPath = normalizeUrl(href);
                 const linkText = link.textContent.trim();
                 
-                // 高亮首页/博客链接
+                // 方法1：路径匹配
+                if (pathsMatch(currentUrl, href)) {
+                    link.classList.add('active');
+                    return;
+                }
+                
+                // 方法2：根据页面类型匹配
                 if (isIndex) {
-                    if (linkPath === '/' || linkPath === sitePath || 
-                        linkPath === '/index.php' || linkPath === (sitePath + '/index.php') ||
-                        linkText.includes('首页') || linkText.includes('博客')) {
+                    // 首页：匹配包含"首页"或"博客"的链接，或者链接指向首页
+                    if (linkText.includes('首页') || linkText.includes('博客') || 
+                        pathsMatch(href, '/') || pathsMatch(href, '/index.php')) {
                         link.classList.add('active');
+                        return;
                     }
-                }
-                // 高亮文章链接（包括 archive、post、category、tag）
-                else if (isArchive || isCategory || isTag || isBlogArchive) {
+                } else if (isArchive || isCategory || isTag || isBlogArchive) {
+                    // 文章相关页面：匹配包含"文章"的链接，或者链接指向文章列表
                     if (linkText.includes('文章') || 
-                        linkPath.includes('/archives') || 
-                        linkPath.includes('/blog/') ||
-                        linkPath.includes('/blog')) {
+                        href.includes('/archives') || href.includes('/blog')) {
                         link.classList.add('active');
-                    }
-                }
-                // 高亮独立页面（通过比较 URL 路径）
-                else {
-                    // 提取当前页面的 slug（从 .html 或路径中）
-                    const currentSlug = currentPath.match(/\/([^\/]+)\.html$/) ? 
-                                       currentPath.match(/\/([^\/]+)\.html$/)[1] :
-                                       currentPath.split('/').pop();
-                    
-                    // 提取链接的 slug
-                    const linkSlug = linkPath.match(/\/([^\/]+)\.html$/) ? 
-                                    linkPath.match(/\/([^\/]+)\.html$/)[1] :
-                                    linkPath.split('/').pop();
-                    
-                    // 如果 slug 匹配，高亮该链接
-                    if (currentSlug && linkSlug && currentSlug === linkSlug) {
-                        link.classList.add('active');
+                        return;
                     }
                 }
             });
         }
         
-        // 页面加载时执行
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', updateNavbarActive);
-        } else {
-            updateNavbarActive();
+        // 立即执行一次
+        updateNavbarActive();
+        
+        // 使用轮询 + 事件监听的双重保障
+        let checkInterval = null;
+        
+        function startUrlCheck() {
+            // 清除旧的定时器
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+            
+            // 每 100ms 检查一次 URL 是否变化（持续 2 秒）
+            let checkCount = 0;
+            const maxChecks = 20; // 2秒 = 20 * 100ms
+            
+            checkInterval = setInterval(function() {
+                const currentUrl = window.location.href;
+                if (currentUrl !== lastUrl) {
+                    lastUrl = currentUrl;
+                    updateNavbarActive();
+                    checkCount = maxChecks; // 找到变化后停止检查
+                }
+                checkCount++;
+                if (checkCount >= maxChecks) {
+                    clearInterval(checkInterval);
+                    checkInterval = null;
+                }
+            }, 100);
         }
         
-        // pjax 加载完成后执行
-        $(document).on('pjax:complete', function() {
-            setTimeout(updateNavbarActive, 50);
+        // 监听所有可能的 pjax 事件
+        $(document).on('pjax:send pjax:success pjax:complete pjax:end', function() {
+            startUrlCheck();
+        });
+        
+        // 监听浏览器前进/后退
+        window.addEventListener('popstate', function() {
+            setTimeout(function() {
+                lastUrl = window.location.href;
+                updateNavbarActive();
+            }, 50);
+        });
+        
+        // 监听所有链接点击（包括非 pjax 链接）
+        $(document).on('click', 'a', function() {
+            const href = this.getAttribute('href');
+            if (href && href.indexOf('#') !== 0) {
+                setTimeout(function() {
+                    updateNavbarActive();
+                }, 100);
+            }
         });
     })();
 </script>

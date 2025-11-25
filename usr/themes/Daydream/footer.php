@@ -47,20 +47,28 @@
     });
     $(document).on('pjax:complete', function() {   
         // alert('加载完成');
-        // Aplayer 插件代码
-        var len = APlayerOptions.length;
-        for(var i=0;i<len;i++){
-            APlayers[i] = new APlayer({
-                element: document.getElementById('player' + APlayerOptions[i]['id']),
-                narrow: false,
-                preload: APlayerOptions[i]['preload'],
-                mutex: APlayerOptions[i]['mutex'],
-                autoplay: APlayerOptions[i]['autoplay'],
-                showlrc: APlayerOptions[i]['showlrc'],
-                music: APlayerOptions[i]['music'],
-                theme: APlayerOptions[i]['theme']
-            });
-            APlayers[i].init();
+        // Aplayer 插件代码（如果存在）
+        if (typeof APlayerOptions !== 'undefined' && Array.isArray(APlayerOptions) && APlayerOptions.length > 0) {
+            if (typeof APlayers === 'undefined') {
+                window.APlayers = [];
+            }
+            var len = APlayerOptions.length;
+            for(var i=0;i<len;i++){
+                var playerElement = document.getElementById('player' + APlayerOptions[i]['id']);
+                if (playerElement) {
+                    APlayers[i] = new APlayer({
+                        element: playerElement,
+                        narrow: false,
+                        preload: APlayerOptions[i]['preload'],
+                        mutex: APlayerOptions[i]['mutex'],
+                        autoplay: APlayerOptions[i]['autoplay'],
+                        showlrc: APlayerOptions[i]['showlrc'],
+                        music: APlayerOptions[i]['music'],
+                        theme: APlayerOptions[i]['theme']
+                    });
+                    APlayers[i].init();
+                }
+            }
         }
         // 重新初始化折叠内容功能
         $('.fold-header').off('click').on('click', function() {
