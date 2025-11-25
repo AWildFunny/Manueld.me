@@ -26,22 +26,22 @@
 
 @media (min-width: 576px) {
     body > footer, body > header, body > main, section {
-        --block-spacing-vertical:calc(var(--spacing) * 1)
+        --block-spacing-vertical:calc(var(--spacing) * 0.5)
     }
 }
 @media (min-width: 768px) {
     body > footer, body > header, body > main, section {
-        --block-spacing-vertical:calc(var(--spacing) * 1.5)
+        --block-spacing-vertical:calc(var(--spacing) * 0.75)
     }
 }
 @media (min-width: 992px) {
     body > footer, body > header, body > main, section {
-        --block-spacing-vertical:calc(var(--spacing) * 1.75)
+        --block-spacing-vertical:calc(var(--spacing) * 0.875)
     }
 }
 @media (min-width: 1200px) {
     body > footer, body > header, body > main, section {
-        --block-spacing-vertical: calc(var(--spacing) * 2);
+        --block-spacing-vertical: calc(var(--spacing) * 1);
     }
 }
 
@@ -165,7 +165,7 @@ section {
 }
 
 hr {
-    --block-spacing-vertical: calc(var(--spacing) * 2);
+    --block-spacing-vertical: calc(var(--spacing) * 1);
     margin-top: var(--block-spacing-vertical);
     margin-bottom: var(--block-spacing-vertical);
 }
@@ -365,12 +365,12 @@ nav a:focus { color: var(--secondary-focus); }
 /* 首页自定义模板样式 */
 .recommended-posts,
 .recent-posts {
-    margin-top: calc(var(--spacing) * 2);
+    margin-top: calc(var(--spacing) * 1);
 }
 
 .recommended-posts h2,
 .recent-posts h2 {
-    margin-bottom: calc(var(--spacing) * 1.5);
+    margin-bottom: calc(var(--spacing) * 0.5);
     display: flex;
     align-items: center;
     gap: calc(var(--spacing) * 0.5);
@@ -384,7 +384,7 @@ nav a:focus { color: var(--secondary-focus); }
 .posts-list {
     display: flex;
     flex-direction: column;
-    gap: calc(var(--spacing) * 1.5);
+    gap: calc(var(--spacing) * 0.5);
 }
 
 .post-item {
@@ -406,7 +406,7 @@ nav a:focus { color: var(--secondary-focus); }
 }
 
 .post-item h3 a {
-    color: var(--color);
+    color: #000000;
     text-decoration: none;
     transition: color 0.3s ease;
 }

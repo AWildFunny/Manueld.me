@@ -83,28 +83,39 @@ $category = $db->fetchRow($db->select('mid', 'name', 'slug')
     ->limit(1));
 
 if ($category):
-    // 使用 Widget 获取该分类下的文章
-    Typecho_Widget::widget('Widget_Archive', array(
-        'type' => 'category',
-        'mid' => $category['mid'],
-        'pageSize' => 10
-    ))->to($recommended);
+    // 直接使用数据库查询获取该分类下的文章（更可靠的方法）
+    $recommendedPosts = $db->fetchAll($db->select('table.contents.cid', 'table.contents.title', 'table.contents.slug', 
+            'table.contents.created', 'table.contents.text', 'table.contents.authorId')
+        ->from('table.contents')
+        ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+        ->where('table.relationships.mid = ?', $category['mid'])
+        ->where('table.contents.type = ?', 'post')
+        ->where('table.contents.status = ?', 'publish')
+        ->order('table.contents.created', Typecho_Db::SORT_DESC)
+        ->limit(10));
     
-    if ($recommended->have()): ?>
+    if (!empty($recommendedPosts)): ?>
         <section class="recommended-posts">
             <h2><i class="czs-star"></i> 推荐阅读</h2>
             <div class="posts-list">
-                <?php while ($recommended->next()): ?>
+                <?php foreach ($recommendedPosts as $post): 
+                    // 生成文章链接
+                    $postUrl = Typecho_Common::url('archives/' . $post['cid'] . '/', $this->options->index);
+                    // 生成文章摘要
+                    $postExcerpt = Typecho_Common::subStr(strip_tags($post['text']), 0, 150) . '...';
+                    // 格式化日期
+                    $postDate = date('Y-m-d', $post['created']);
+                ?>
                     <article class="post-item">
-                        <h3><a href="<?php $recommended->permalink(); ?>"><?php $recommended->title(); ?></a></h3>
-                        <p class="post-excerpt"><?php $recommended->excerpt(150, '...'); ?></p>
+                        <h3><a href="<?php echo $postUrl; ?>"><?php echo htmlspecialchars($post['title']); ?></a></h3>
+                        <p class="post-excerpt"><?php echo $postExcerpt; ?></p>
                         <div class="post-meta">
-                            <time datetime="<?php $recommended->date('c'); ?>">
-                                <?php $recommended->date('Y-m-d'); ?>
+                            <time datetime="<?php echo date('c', $post['created']); ?>">
+                                <?php echo $postDate; ?>
                             </time>
                         </div>
                     </article>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             </div>
         </section>
         <hr>
