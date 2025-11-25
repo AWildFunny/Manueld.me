@@ -261,25 +261,6 @@
             var isVerifying = false;
             var formSubmitHandlerRemoved = false; // 标记是否已移除事件监听器
             
-            // 初始化图片加载监听器
-            console.log('[CAPTCHA] 初始化验证码图片监听器');
-            console.log('[CAPTCHA] 图片元素:', captchaImage);
-            console.log('[CAPTCHA] 初始图片 URL:', captchaImage ? captchaImage.src : '(未找到)');
-            
-            if (captchaImage) {
-                // 监听初始加载
-                captchaImage.addEventListener('load', function() {
-                    console.log('[CAPTCHA] ✅ 初始图片加载成功');
-                    console.log('[CAPTCHA] 图片尺寸:', captchaImage.naturalWidth + 'x' + captchaImage.naturalHeight);
-                });
-                
-                captchaImage.addEventListener('error', function(e) {
-                    console.error('[CAPTCHA] ❌ 初始图片加载失败');
-                    console.error('[CAPTCHA] 错误事件:', e);
-                    console.error('[CAPTCHA] 失败的 URL:', captchaImage.src);
-                });
-            }
-            
             // 简单对话框元素
             var simpleDialog = document.getElementById('simple-dialog');
             var simpleDialogOverlay = document.getElementById('simple-dialog-overlay');
@@ -303,149 +284,11 @@
             simpleDialogOk.addEventListener('click', hideSimpleDialog);
             simpleDialogOverlay.addEventListener('click', hideSimpleDialog);
             
-            // 读取并输出调试信息
-            function readDebugInfo(imageUrl) {
-                console.log('[CAPTCHA] 正在获取服务器调试信息...');
-                // 使用 fetch 获取完整响应（包括响应头）
-                fetch(imageUrl, { 
-                    method: 'GET', 
-                    cache: 'no-cache',
-                    credentials: 'same-origin'
-                })
-                    .then(function(response) {
-                        console.log('[CAPTCHA] 响应状态:', response.status, response.statusText);
-                        console.log('[CAPTCHA] Content-Type:', response.headers.get('Content-Type'));
-                        
-                        var debugHeader = response.headers.get('X-Captcha-Debug');
-                        if (debugHeader) {
-                            try {
-                                var debugInfo = JSON.parse(atob(debugHeader));
-                                console.group('[CAPTCHA] 🔍 服务器调试信息');
-                                console.log('时间戳:', debugInfo.timestamp);
-                                console.log('执行步骤数量:', debugInfo.steps.length);
-                                console.log('执行步骤详情:');
-                                debugInfo.steps.forEach(function(step, index) {
-                                    console.log('步骤 ' + (index + 1) + ':', step.step, step.data || '');
-                                });
-                                console.table(debugInfo.steps);
-                                console.groupEnd();
-                            } catch (e) {
-                                console.warn('[CAPTCHA] 解析调试信息失败:', e);
-                                console.log('[CAPTCHA] 原始调试头:', debugHeader);
-                            }
-                        } else {
-                            console.warn('[CAPTCHA] ⚠️ 未找到调试信息头 (X-Captcha-Debug)');
-                            console.log('[CAPTCHA] 所有响应头:', Array.from(response.headers.entries()));
-                        }
-                        
-                        // 检查响应体大小
-                        var contentLength = response.headers.get('Content-Length');
-                        console.log('[CAPTCHA] Content-Length:', contentLength || '(未设置)');
-                        
-                        return response.blob();
-                    })
-                    .then(function(blob) {
-                        console.log('[CAPTCHA] 响应体大小:', blob.size, 'bytes');
-                        if (blob.size === 0) {
-                            console.error('[CAPTCHA] ❌ 响应体为空！');
-                        }
-                    })
-                    .catch(function(error) {
-                        console.error('[CAPTCHA] 获取调试信息失败:', error);
-                    });
-            }
-            
             // 刷新验证码图片
             function refreshCaptcha() {
-                var oldSrc = captchaImage.src;
-                var newSrc = captchaImage.src.split('?')[0] + '?' + Math.random();
-                console.log('[CAPTCHA] 刷新验证码图片');
-                console.log('[CAPTCHA] 旧 URL:', oldSrc);
-                console.log('[CAPTCHA] 新 URL:', newSrc);
-                
-                // 清除之前的错误状态
+                captchaImage.src = captchaImage.src.split('?')[0] + '?' + Math.random();
                 captchaInput.value = '';
                 captchaError.style.display = 'none';
-                
-                // 添加加载事件监听器
-                captchaImage.onload = function() {
-                    console.log('[CAPTCHA] ✅ 图片加载成功');
-                    console.log('[CAPTCHA] 图片尺寸:', captchaImage.naturalWidth + 'x' + captchaImage.naturalHeight);
-                    console.log('[CAPTCHA] 图片实际显示尺寸:', captchaImage.offsetWidth + 'x' + captchaImage.offsetHeight);
-                    
-                    // 读取调试信息
-                    readDebugInfo(captchaImage.src);
-                };
-                
-                captchaImage.onerror = function(e) {
-                    console.error('[CAPTCHA] ❌ 图片加载失败');
-                    console.error('[CAPTCHA] 错误事件:', e);
-                    console.error('[CAPTCHA] 失败的 URL:', captchaImage.src);
-                    console.error('[CAPTCHA] 图片状态:', {
-                        complete: captchaImage.complete,
-                        naturalWidth: captchaImage.naturalWidth,
-                        naturalHeight: captchaImage.naturalHeight
-                    });
-                    
-                    // 尝试获取调试信息（使用完整请求）
-                    console.log('[CAPTCHA] 尝试获取服务器调试信息...');
-                    fetch(captchaImage.src, { cache: 'no-cache' })
-                        .then(function(response) {
-                            var debugHeader = response.headers.get('X-Captcha-Debug');
-                            if (debugHeader) {
-                                try {
-                                    var debugInfo = JSON.parse(atob(debugHeader));
-                                    console.group('[CAPTCHA] 🔍 服务器调试信息（错误时）');
-                                    console.log('时间戳:', debugInfo.timestamp);
-                                    console.log('执行步骤:', debugInfo.steps);
-                                    console.table(debugInfo.steps);
-                                    console.groupEnd();
-                                } catch (e) {
-                                    console.warn('[CAPTCHA] 解析调试信息失败:', e);
-                                }
-                            }
-                            
-                            // 检查响应内容类型
-                            var contentType = response.headers.get('Content-Type');
-                            console.log('[CAPTCHA] 响应 Content-Type:', contentType);
-                            
-                            // 如果返回的是 JSON，尝试解析
-                            if (contentType && contentType.includes('application/json')) {
-                                return response.text().then(function(text) {
-                                    try {
-                                        var jsonData = JSON.parse(text);
-                                        console.group('[CAPTCHA] 📋 服务器返回的 JSON 错误信息');
-                                        console.log(jsonData);
-                                        console.groupEnd();
-                                    } catch (e) {
-                                        console.warn('[CAPTCHA] 解析 JSON 失败:', e);
-                                        console.log('[CAPTCHA] 原始响应:', text);
-                                    }
-                                });
-                            }
-                        })
-                        .catch(function(error) {
-                            console.error('[CAPTCHA] 获取调试信息失败:', error);
-                        });
-                };
-                
-                // 设置新的图片源
-                captchaImage.src = newSrc;
-                
-                // 检查图片是否立即加载（可能已缓存）
-                setTimeout(function() {
-                    if (captchaImage.complete) {
-                        if (captchaImage.naturalWidth === 0 || captchaImage.naturalHeight === 0) {
-                            console.warn('[CAPTCHA] ⚠️ 图片加载完成但尺寸为 0，可能是空响应');
-                            // 读取调试信息
-                            readDebugInfo(captchaImage.src);
-                        } else {
-                            console.log('[CAPTCHA] ✅ 图片已缓存，尺寸:', captchaImage.naturalWidth + 'x' + captchaImage.naturalHeight);
-                        }
-                    } else {
-                        console.log('[CAPTCHA] ⏳ 图片正在加载中...');
-                    }
-                }, 100);
             }
             
             // 显示验证码弹窗
