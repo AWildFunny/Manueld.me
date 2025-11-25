@@ -62,6 +62,104 @@ body>header {
     padding-bottom: calc(var(--spacing) * 1);
 }
 
+/* Header 和 Navbar 水平布局 - 方案一：Flexbox */
+.header-navbar-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: calc(var(--spacing) * 2);
+    padding-bottom: calc(var(--spacing) * 1);
+    gap: calc(var(--spacing) * 2);
+}
+
+.site-header {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1);
+    text-align: left;
+    flex: 0 0 auto;
+}
+
+.site-header .headpic {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+}
+
+.site-header hgroup {
+    margin: 0;
+}
+
+.site-header hgroup h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.2;
+}
+
+.site-header hgroup h4 {
+    margin: calc(var(--spacing) * 0.25) 0 0 0;
+    font-size: 0.9rem;
+    font-weight: normal;
+    color: var(--muted-color);
+}
+
+/* Navbar 在右侧对齐 */
+.header-navbar-wrapper .navbar {
+    flex: 0 0 auto;
+    position: relative;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+
+.header-navbar-wrapper .navbar .navbar-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.header-navbar-wrapper .navbar ul {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: flex-end;
+    gap: calc(var(--spacing) * 0.5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.header-navbar-wrapper .navbar li {
+    margin: 0;
+}
+
+.header-navbar-wrapper .navbar a:not(.navbar-avatar-link) {
+    display: block;
+    padding: calc(var(--spacing) * 0.5) calc(var(--spacing) * 0.75);
+    white-space: nowrap;
+}
+
+/* 响应式设计：移动端垂直排列 */
+@media (max-width: 767px) {
+    .header-navbar-wrapper {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: calc(var(--spacing) * 1);
+    }
+    
+    .site-header {
+        width: 100%;
+    }
+    
+    .header-navbar-wrapper .navbar {
+        width: 100%;
+    }
+    
+    .header-navbar-wrapper .navbar ul {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+}
+
 section {
     margin-top: var(--block-spacing-vertical);
 }
@@ -119,11 +217,138 @@ h5 { --typography-spacing-vertical: 0.5rem; }
     z-index: 1020;
 
     --font-weight: 500;
-    transition: .3s;
+    transition: all .3s ease;
+    background-color: transparent;
 }
 
-.navbar a .active {
-    border-bottom: solid var(--primary);
+/* Header 和 Navbar 水平布局时，navbar 的初始状态 */
+.header-navbar-wrapper .navbar {
+    position: relative;
+    background-color: transparent;
+}
+
+/* Navbar 固定在顶部时的样式 */
+.navbar.navbar-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: calc(var(--spacing) * 0.5) 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+/* Navbar-fixed 内部容器，保持与主内容对齐 */
+.navbar.navbar-fixed .navbar-container {
+    width: 100%;
+    max-width: 768px;
+    margin: 0 auto;
+    padding-left: calc(var(--spacing) * 2);
+    padding-right: calc(var(--spacing) * 2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+/* 深色主题下的 navbar-fixed 背景 */
+[data-theme=dark] .navbar.navbar-fixed {
+    background-color: rgba(26, 26, 26, 0.8);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) .navbar.navbar-fixed {
+        background-color: rgba(26, 26, 26, 0.8);
+    }
+}
+
+/* Main 元素的顶部间距设置 */
+main.container,
+main#pjax-container {
+    padding-top: 0px;
+}
+
+/* Navbar 固定在顶部时，需要为 main 添加 margin-top 以避免内容被遮挡 */
+body.navbar-fixed-active main {
+    margin-top: calc(var(--spacing) * 1);
+}
+
+/* 确保 navbar-fixed 时不会遮挡 wrapper */
+.header-navbar-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+/* Navbar 小头像 - 默认隐藏 */
+.navbar-avatar-link {
+    display: none;
+    align-items: center;
+    text-decoration: none;
+    margin-right: calc(var(--spacing) * 1);
+    flex-shrink: 0;
+}
+
+.navbar-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.navbar-avatar-link:hover .navbar-avatar {
+    transform: scale(1.1);
+}
+
+/* Navbar 固定在顶部时显示小头像 */
+.navbar.navbar-fixed .navbar-avatar-link {
+    display: flex;
+}
+
+/* Navbar 固定在顶部时，ul 的样式调整 */
+.navbar.navbar-fixed ul {
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+/* 响应式：移动端 navbar-fixed 的 padding 调整 */
+@media (max-width: 767px) {
+    .navbar.navbar-fixed .navbar-container {
+        padding-left: calc(var(--spacing) * 1);
+        padding-right: calc(var(--spacing) * 1);
+    }
+    
+    .navbar.navbar-fixed ul {
+        flex-wrap: wrap;
+        gap: calc(var(--spacing) * 0.25);
+    }
+    
+    .navbar.navbar-fixed .navbar-avatar {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .navbar.navbar-fixed .navbar-avatar-link {
+        margin-right: calc(var(--spacing) * 0.5);
+    }
+}
+
+/* 导航链接高亮样式 */
+.navbar a.active {
+    border-bottom: 2px solid var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.navbar a.active:hover {
+    color: var(--primary);
 }
 
 nav {
