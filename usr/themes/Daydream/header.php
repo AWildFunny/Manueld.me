@@ -58,6 +58,8 @@
     <!-- KaTeX.js -->
     <script src="<?php $this->options->themeUrl('/assets/js/katex/katex.min.js');?>"></script>
     <script src="<?php $this->options->themeUrl('/assets/js/katex/auto-render.min.js');?>"></script>
+    <!-- Category Filter -->
+    <script src="<?php $this->options->themeUrl('/assets/js/category-filter.js');?>"></script>
 
     <?php $this->options->headerCode(); ?>
 

@@ -169,3 +169,243 @@ function showUserAgent($ua) {
 
     echo "&nbsp;" . $OsImg . "&nbsp;" . $BrowserImg;
 }
+
+/**
+ * 分类筛选组件辅助函数
+ */
+
+/**
+ * Theme初始化函数，用于修改Archive查询
+ * 注意：Typecho的themeInit函数在Archive Widget初始化后调用
+ * 此时查询已经执行，所以这里主要用于其他初始化工作
+ */
+function themeInit($archive) {
+    // 可以在这里添加其他初始化逻辑
+    // 筛选逻辑在index.php中处理
+}
+
+/**
+ * 判断是否为archive页面
+ * 注意：此函数需要在Archive Widget上下文中调用
+ * @param object|null $archive Archive Widget对象，如果为null则从全局获取
+ * @return bool
+ */
+function isArchivePage($archive = null) {
+    // 如果传入了Archive对象，直接使用
+    if ($archive && method_exists($archive, 'is')) {
+        return $archive->is('archive');
+    }
+    
+    // 否则通过路径判断
+    $request = Typecho_Request::getInstance();
+    $pathInfo = $request->getPathInfo();
+    $options = Helper::options();
+    
+    // 获取archive路由URL
+    $archiveUrl = $options->routingTable['archive']['url'] ?? '/blog/';
+    $archivePath = parse_url($archiveUrl, PHP_URL_PATH);
+    if (!$archivePath) {
+        $archivePath = '/blog/';
+    }
+    
+    // 规范化路径
+    $currentPath = rtrim($pathInfo, '/') ?: '/';
+    $archivePath = rtrim($archivePath, '/') ?: '/';
+    
+    // 检查是否匹配archive路径
+    if ($currentPath === $archivePath) {
+        return true;
+    }
+    
+    // 检查是否以archive路径开头（处理分页等情况）
+    if (strpos($currentPath, $archivePath) === 0) {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * 获取所有分类及图标
+ * @return array
+ */
+function getCategoriesWithIcons() {
+    $categories = \Widget\Metas\Category\Rows::alloc();
+    $categories->execute();
+    $result = [];
+    
+    while ($categories->next()) {
+        $icon = $categories->description ?: '📁'; // 从描述字段读取图标，默认为📁
+        $result[] = [
+            'mid' => $categories->mid,
+            'name' => $categories->name,
+            'slug' => $categories->slug,
+            'permalink' => $categories->permalink,
+            'icon' => $icon,
+            'count' => getCategoryPostCount($categories->mid)
+        ];
+    }
+    
+    return $result;
+}
+
+/**
+ * 获取分类文章数量
+ * @param int $mid 分类ID
+ * @return int
+ */
+function getCategoryPostCount($mid) {
+    $db = Typecho_Db::get();
+    $count = $db->fetchObject($db->select('COUNT(DISTINCT table.contents.cid) as cnt')
+        ->from('table.contents')
+        ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+        ->where('table.relationships.mid = ?', $mid)
+        ->where('table.contents.type = ?', 'post')
+        ->where('table.contents.status = ?', 'publish'))->cnt;
+    return intval($count);
+}
+
+/**
+ * 根据筛选条件获取标签云数据
+ * @param string|null $categorySlug 分类slug
+ * @param string|null $searchKeyword 搜索关键词
+ * @return array
+ */
+function getTagsByFilter($categorySlug = null, $searchKeyword = null) {
+    $db = Typecho_Db::get();
+    
+    // 构建查询
+    $select = $db->select('table.metas.mid', 'table.metas.name', 'table.metas.slug')
+        ->from('table.metas')
+        ->join('table.relationships', 'table.metas.mid = table.relationships.mid')
+        ->join('table.contents', 'table.relationships.cid = table.contents.cid')
+        ->where('table.metas.type = ?', 'tag')
+        ->where('table.contents.type = ?', 'post')
+        ->where('table.contents.status = ?', 'publish')
+        ->group('table.metas.mid');
+    
+    // 如果指定了分类
+    if ($categorySlug) {
+        $category = $db->fetchRow($db->select('mid')
+            ->from('table.metas')
+            ->where('type = ?', 'category')
+            ->where('slug = ?', $categorySlug)
+            ->limit(1));
+        
+        if ($category) {
+            // 获取该分类下的文章ID
+            $postIds = $db->fetchAll($db->select('table.contents.cid')
+                ->from('table.contents')
+                ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid = ?', $category['mid'])
+                ->where('table.contents.type = ?', 'post')
+                ->where('table.contents.status = ?', 'publish'));
+            
+            if (!empty($postIds)) {
+                $postIdArray = array_column($postIds, 'cid');
+                $select->where('table.contents.cid IN (' . implode(',', array_map('intval', $postIdArray)) . ')');
+            } else {
+                // 如果没有文章，返回空数组
+                return [];
+            }
+        } else {
+            // 分类不存在，返回空数组
+            return [];
+        }
+    }
+    
+    // 保存原始搜索关键词（用于后续计算）
+    $originalSearchKeyword = $searchKeyword;
+    
+    // 如果指定了搜索关键词
+    if ($searchKeyword) {
+        $searchPattern = '%' . $searchKeyword . '%';
+        $select->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+    }
+    
+    // 获取标签及数量
+    $tags = $db->fetchAll($select);
+    $result = [];
+    
+    foreach ($tags as $tag) {
+        // 计算每个标签的文章数量（应用相同的筛选条件）
+        $countSelect = $db->select('COUNT(DISTINCT table.contents.cid) as cnt')
+            ->from('table.contents')
+            ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+            ->where('table.relationships.mid = ?', $tag['mid'])
+            ->where('table.contents.type = ?', 'post')
+            ->where('table.contents.status = ?', 'publish');
+        
+        // 应用分类筛选条件
+        if ($categorySlug && isset($category) && isset($postIdArray) && !empty($postIdArray)) {
+            $countSelect->where('table.contents.cid IN (' . implode(',', array_map('intval', $postIdArray)) . ')');
+        }
+        
+        // 应用搜索筛选条件
+        if ($originalSearchKeyword) {
+            $searchPattern = '%' . $originalSearchKeyword . '%';
+            $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+        }
+        
+        try {
+            $countResult = $db->fetchObject($countSelect);
+            $count = $countResult ? intval($countResult->cnt) : 0;
+            
+            if ($count > 0) {
+                $result[] = [
+                    'mid' => $tag['mid'],
+                    'name' => $tag['name'],
+                    'slug' => $tag['slug'],
+                    'count' => $count
+                ];
+            }
+        } catch (Exception $e) {
+            // 查询失败，跳过此标签
+            continue;
+        }
+    }
+    
+    // 按数量排序
+    usort($result, function($a, $b) {
+        return $b['count'] - $a['count'];
+    });
+    
+    return $result;
+}
+
+/**
+ * 生成筛选URL
+ * @param string|null $category 分类slug
+ * @param array $tags 标签数组
+ * @param string|null $search 搜索关键词
+ * @param int|null $page 页码
+ * @return string
+ */
+function getFilterUrl($category = null, $tags = [], $search = null, $page = null) {
+    $params = [];
+    
+    if ($category) {
+        $params['cat'] = $category;
+    }
+    
+    if (!empty($tags)) {
+        $params['tags'] = implode(',', array_map('urlencode', $tags));
+    }
+    
+    if ($search) {
+        $params['search'] = urlencode($search);
+    }
+    
+    if ($page && $page > 1) {
+        $params['page'] = $page;
+    }
+    
+    $options = Helper::options();
+    $archiveUrl = Typecho_Common::url($options->routingTable['archive']['url'], $options->index);
+    
+    if (!empty($params)) {
+        return $archiveUrl . '?' . http_build_query($params);
+    }
+    
+    return $archiveUrl;
+}
