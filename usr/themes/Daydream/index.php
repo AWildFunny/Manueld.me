@@ -105,6 +105,24 @@ if ($this->is('archive')):
         try {
             $result = $db->fetchObject($countSelect);
             $filteredPostCount = $result ? intval($result->cnt) : 0;
+            
+            // 注意：由于在functions.php中通过handleInit钩子已经修改了查询条件
+            // Archive Widget的countSql会自动包含筛选条件，total也会自动计算正确
+            // 但为了确保兼容性和处理边界情况，这里仍然手动设置total
+            // 使用反射访问私有属性
+            $reflection = new ReflectionClass($this);
+            
+            // 设置total属性，确保分页正确
+            $totalProperty = $reflection->getProperty('total');
+            $totalProperty->setAccessible(true);
+            $totalProperty->setValue($this, $filteredPostCount);
+            
+            // 修改countSql，确保分页计算基于筛选后的查询
+            // 注意：由于handleInit钩子已经修改了查询，countSql应该已经包含筛选条件
+            // 但为了确保，这里仍然设置一次
+            $countSqlProperty = $reflection->getProperty('countSql');
+            $countSqlProperty->setAccessible(true);
+            $countSqlProperty->setValue($this, $countSelect);
         } catch (Exception $e) {
             $filteredPostCount = $totalPosts;
         }

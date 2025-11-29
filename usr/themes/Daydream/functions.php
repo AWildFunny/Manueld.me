@@ -185,6 +185,88 @@ function themeInit($archive) {
 }
 
 /**
+ * 在查询执行前应用筛选条件
+ * 通过Typecho插件钩子系统修改Archive查询
+ */
+Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $select) {
+    // 只在archive页面应用筛选
+    if (!$archive->is('archive')) {
+        return;
+    }
+    
+    // 读取URL参数
+    $request = Typecho_Request::getInstance();
+    $currentCategory = $request->get('cat', '');
+    $currentTags = $request->get('tags', '');
+    $currentSearch = $request->get('search', '');
+    
+    // 如果没有筛选条件，直接返回
+    if (!$currentCategory && !$currentTags && !$currentSearch) {
+        return;
+    }
+    
+    // 处理标签参数
+    $selectedTags = [];
+    if ($currentTags) {
+        $decodedTags = urldecode($currentTags);
+        $selectedTags = array_map('trim', explode(',', $decodedTags));
+        $selectedTags = array_filter($selectedTags);
+    }
+    
+    // 处理搜索关键词
+    $searchKeyword = $currentSearch ? urldecode($currentSearch) : null;
+    
+    // 获取数据库对象
+    $db = Typecho_Db::get();
+    
+    // 应用分类筛选
+    if ($currentCategory) {
+        $category = $db->fetchRow($db->select('mid')
+            ->from('table.metas')
+            ->where('type = ?', 'category')
+            ->where('slug = ?', $currentCategory)
+            ->limit(1));
+        
+        if ($category) {
+            $select->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid = ?', $category['mid']);
+        }
+    }
+    
+    // 应用标签筛选（需要包含所有选中的标签）
+    if (!empty($selectedTags)) {
+        $tagMids = [];
+        foreach ($selectedTags as $tagName) {
+            $tag = $db->fetchRow($db->select('mid')
+                ->from('table.metas')
+                ->where('type = ?', 'tag')
+                ->where('name = ?', $tagName)
+                ->limit(1));
+            if ($tag) {
+                $tagMids[] = $tag['mid'];
+            }
+        }
+        
+        if (!empty($tagMids)) {
+            // 如果还没有join relationships表，先join
+            if (!$currentCategory) {
+                $select->join('table.relationships', 'table.contents.cid = table.relationships.cid');
+            }
+            // 使用group和having确保文章包含所有选中的标签
+            $select->where('table.relationships.mid IN ?', $tagMids)
+                ->group('table.contents.cid')
+                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+        }
+    }
+    
+    // 应用搜索筛选
+    if ($searchKeyword) {
+        $searchPattern = '%' . $searchKeyword . '%';
+        $select->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+    }
+};
+
+/**
  * 判断是否为archive页面
  * 注意：此函数需要在Archive Widget上下文中调用
  * @param object|null $archive Archive Widget对象，如果为null则从全局获取
