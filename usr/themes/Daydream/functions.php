@@ -219,6 +219,10 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
     // 获取数据库对象
     $db = Typecho_Db::get();
     
+    // 初始化变量，用于后续计数查询
+    $category = null;
+    $tagMids = [];
+    
     // 应用分类筛选
     if ($currentCategory) {
         $category = $db->fetchRow($db->select('mid')
@@ -235,7 +239,6 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
     
     // 应用标签筛选（需要包含所有选中的标签）
     if (!empty($selectedTags)) {
-        $tagMids = [];
         foreach ($selectedTags as $tagName) {
             $tag = $db->fetchRow($db->select('mid')
                 ->from('table.metas')
@@ -263,6 +266,63 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
     if ($searchKeyword) {
         $searchPattern = '%' . $searchKeyword . '%';
         $select->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+    }
+    
+    // 计算筛选后的总数和总页数，确保页码不超出范围
+    // 重新构建计数查询，应用相同的筛选条件
+    $countSelect = $db->select('COUNT(DISTINCT table.contents.cid) as cnt')
+        ->from('table.contents')
+        ->where('table.contents.type = ?', 'post')
+        ->where('table.contents.status = ?', 'publish');
+    
+    // 重新应用分类筛选
+    if ($currentCategory && $category) {
+        $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+            ->where('table.relationships.mid = ?', $category['mid']);
+    }
+    
+    // 重新应用标签筛选
+    if (!empty($tagMids)) {
+        // 如果还没有join relationships表，先join
+        if (!$currentCategory || !$category) {
+            $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid');
+        }
+        $countSelect->where('table.relationships.mid IN ?', $tagMids)
+            ->group('table.contents.cid')
+            ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+    }
+    
+    // 重新应用搜索筛选
+    if ($searchKeyword) {
+        $searchPattern = '%' . $searchKeyword . '%';
+        $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+    }
+    
+    try {
+        $result = $db->fetchObject($countSelect);
+        $filteredTotal = $result ? intval($result->cnt) : 0;
+        
+        // 计算总页数
+        $pageSize = $archive->parameter->pageSize;
+        $totalPages = $pageSize > 0 ? ceil($filteredTotal / $pageSize) : 1;
+        
+        // 获取当前页码
+        $currentPage = $archive->currentPage;
+        
+        // 如果当前页码超出总页数，重置到第1页
+        if ($currentPage > $totalPages && $totalPages > 0) {
+            // 使用反射修改currentPage属性
+            $reflection = new ReflectionClass($archive);
+            $currentPageProperty = $reflection->getProperty('currentPage');
+            $currentPageProperty->setAccessible(true);
+            $currentPageProperty->setValue($archive, 1);
+            
+            // 同时修改request中的page参数，避免后续逻辑使用错误的页码
+            $request->setParam('page', 1);
+        }
+    } catch (Exception $e) {
+        // 如果计算失败，保持原有行为
+        error_log('Filter pagination check error: ' . $e->getMessage());
     }
 };
 
