@@ -105,24 +105,6 @@ if ($this->is('archive')):
         try {
             $result = $db->fetchObject($countSelect);
             $filteredPostCount = $result ? intval($result->cnt) : 0;
-            
-            // 注意：由于在functions.php中通过handleInit钩子已经修改了查询条件
-            // Archive Widget的countSql会自动包含筛选条件，total也会自动计算正确
-            // 但为了确保兼容性和处理边界情况，这里仍然手动设置total
-            // 使用反射访问私有属性
-            $reflection = new ReflectionClass($this);
-            
-            // 设置total属性，确保分页正确
-            $totalProperty = $reflection->getProperty('total');
-            $totalProperty->setAccessible(true);
-            $totalProperty->setValue($this, $filteredPostCount);
-            
-            // 修改countSql，确保分页计算基于筛选后的查询
-            // 注意：由于handleInit钩子已经修改了查询，countSql应该已经包含筛选条件
-            // 但为了确保，这里仍然设置一次
-            $countSqlProperty = $reflection->getProperty('countSql');
-            $countSqlProperty->setAccessible(true);
-            $countSqlProperty->setValue($this, $countSelect);
         } catch (Exception $e) {
             $filteredPostCount = $totalPosts;
         }
@@ -216,73 +198,17 @@ if (!$this->is('archive')) {
     $selectedTags = [];
     $searchKeyword = null;
     $hasFilter = false;
-    $displayedCount = 0;
 } else {
     $hasFilter = ($currentCategory || !empty($selectedTags) || $searchKeyword);
-    $displayedCount = 0;
 }
 
 // 显示文章列表
-// 注意：由于Typecho的架构限制，我们在显示时进行筛选
-// 这会影响分页功能，后续可以通过插件优化
+// 注意：筛选已在查询层面完成（通过functions.php中的插件钩子），
+// 所以这里直接显示查询结果即可，分页也会基于筛选后的结果
 
+$hasPosts = false;
 while ($this->next()): 
-    // 如果有筛选条件，检查文章是否匹配
-    if ($hasFilter) {
-        // 检查分类
-        if ($currentCategory) {
-            $postCategories = $this->categories;
-            $categoryMatch = false;
-            if ($postCategories) {
-                foreach ($postCategories as $postCat) {
-                    if (isset($postCat['slug']) && $postCat['slug'] === $currentCategory) {
-                        $categoryMatch = true;
-                        break;
-                    }
-                }
-            }
-            if (!$categoryMatch) {
-                continue; // 分类不匹配，跳过
-            }
-        }
-        
-        // 检查标签（需要包含所有选中的标签）
-        if (!empty($selectedTags)) {
-            $postTags = $this->tags;
-            $postTagNames = [];
-            if ($postTags) {
-                foreach ($postTags as $tag) {
-                    if (isset($tag['name'])) {
-                        $postTagNames[] = $tag['name'];
-                    }
-                }
-            }
-            
-            $hasAllTags = true;
-            foreach ($selectedTags as $selectedTag) {
-                if (!in_array($selectedTag, $postTagNames)) {
-                    $hasAllTags = false;
-                    break;
-                }
-            }
-            if (!$hasAllTags) {
-                continue; // 标签不匹配，跳过
-            }
-        }
-        
-        // 检查搜索
-        if ($searchKeyword) {
-            $title = $this->title;
-            $content = $this->content;
-            $titleMatch = stripos($title, $searchKeyword) !== false;
-            $contentMatch = stripos(strip_tags($content), $searchKeyword) !== false;
-            if (!$titleMatch && !$contentMatch) {
-                continue; // 搜索不匹配，跳过
-            }
-        }
-    }
-    
-    $displayedCount++;
+    $hasPosts = true;
     ?>
     <section itemscope itemtype="http://schema.org/BlogPosting">
         <?php if ($this->fields->headPic !=''): ?>
@@ -302,7 +228,7 @@ while ($this->next()):
 endwhile;
 
 // 如果没有显示任何文章且有筛选条件，显示提示
-if ($hasFilter && $displayedCount === 0):
+if ($hasFilter && !$hasPosts):
 ?>
     <section>
         <p style="text-align: center; color: var(--muted-color); padding: 40px 20px;">
