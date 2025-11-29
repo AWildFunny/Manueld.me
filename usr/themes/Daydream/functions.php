@@ -186,6 +186,7 @@ function themeInit($archive) {
 /**
  * 在查询层应用筛选条件（分类、标签、搜索）
  * 使用插件钩子 Widget_Archive_HandleInit 在查询执行前修改查询对象
+ * 同时优化 countSql 以确保分页计算正确
  */
 Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $select) {
     // 只在archive页面应用筛选
@@ -257,6 +258,8 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
         } else {
             // 分类下没有文章，直接返回空结果
             $select->where('1 = 0');
+            // 设置总数为0，确保分页计算正确
+            $archive->setTotal(0);
             return;
         }
     }
@@ -294,6 +297,103 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
     
     // 确保只查询文章类型
     $select->where('table.contents.type = ?', 'post');
+    
+    // 手动计算筛选后的文章总数，确保分页计算正确
+    // 使用与 index.php 中相同的计数逻辑，确保一致性
+    try {
+        $countSelect = $db->select('COUNT(DISTINCT table.contents.cid) as cnt')
+            ->from('table.contents')
+            ->where('table.contents.type = ?', 'post')
+            ->where('table.contents.status = ?', 'publish');
+        
+        // 应用分类筛选
+        if ($categoryPostIds !== null) {
+            // 同时有分类和标签筛选，使用分类下的文章ID
+            $countSelect->where('table.contents.cid IN ?', $categoryPostIds);
+        } elseif ($categoryMid !== null) {
+            // 只有分类筛选
+            $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid = ?', $categoryMid);
+        }
+        
+        // 应用标签筛选（多标签AND逻辑）
+        if (!empty($tagMids)) {
+            // 只有在没有 JOIN 的情况下才需要 JOIN
+            // 如果 $categoryMid !== null，前面已经 JOIN 了
+            // 如果 $categoryPostIds !== null，前面使用 IN 没有 JOIN，需要 JOIN
+            if ($categoryPostIds !== null || ($categoryPostIds === null && $categoryMid === null)) {
+                // 需要 JOIN：要么是使用 IN 的情况，要么是完全没有分类筛选
+                $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid');
+            }
+            // 如果 $categoryMid !== null，前面已经 JOIN 了，不需要再次 JOIN
+            
+            $countSelect->where('table.relationships.mid IN ?', $tagMids)
+                ->group('table.contents.cid')
+                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+        }
+        
+        // 应用搜索筛选
+        if ($currentSearch) {
+            $searchKeyword = urldecode($currentSearch);
+            $searchPattern = '%' . $searchKeyword . '%';
+            $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+        }
+        
+        // 执行计数查询
+        // 注意：当有 GROUP BY 时，COUNT(DISTINCT cid) 会返回每个分组的计数（都是1）
+        // 我们需要先获取分组后的文章ID，然后计算数量
+        if (!empty($tagMids)) {
+            // 对于标签筛选，需要先获取分组后的文章ID，然后计数
+            // 重新构建查询，选择 cid 而不是 COUNT
+            $groupedSelect = $db->select('table.contents.cid')
+                ->from('table.contents')
+                ->where('table.contents.type = ?', 'post')
+                ->where('table.contents.status = ?', 'publish');
+            
+            // 应用分类筛选
+            if ($categoryPostIds !== null) {
+                $groupedSelect->where('table.contents.cid IN ?', $categoryPostIds);
+            } elseif ($categoryMid !== null) {
+                $groupedSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                    ->where('table.relationships.mid = ?', $categoryMid);
+            }
+            
+            // 应用标签筛选
+            // 只有在没有 JOIN 的情况下才需要 JOIN
+            // 如果 $categoryMid !== null，前面已经 JOIN 了
+            // 如果 $categoryPostIds !== null，前面使用 IN 没有 JOIN，需要 JOIN
+            if ($categoryPostIds !== null || ($categoryPostIds === null && $categoryMid === null)) {
+                // 需要 JOIN：要么是使用 IN 的情况，要么是完全没有分类筛选
+                $groupedSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid');
+            }
+            // 如果 $categoryMid !== null，前面已经 JOIN 了，不需要再次 JOIN
+            
+            $groupedSelect->where('table.relationships.mid IN ?', $tagMids)
+                ->group('table.contents.cid')
+                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+            
+            // 应用搜索筛选
+            if ($currentSearch) {
+                $searchKeyword = urldecode($currentSearch);
+                $searchPattern = '%' . $searchKeyword . '%';
+                $groupedSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+            }
+            
+            // 获取所有匹配的文章ID，然后计算数量
+            $groupedPosts = $db->fetchAll($groupedSelect);
+            $total = count($groupedPosts);
+        } else {
+            // 没有标签筛选，直接使用 COUNT(DISTINCT)
+            $result = $db->fetchObject($countSelect);
+            $total = $result ? intval($result->cnt) : 0;
+        }
+        
+        // 直接设置总数，这样 getTotal() 方法会直接返回这个值，不会调用 size()
+        $archive->setTotal($total);
+    } catch (Exception $e) {
+        // 如果计数查询失败，回退到让 Typecho 自动处理
+        // countSql 会在 execute() 方法中自动设置
+    }
 };
 
 /**
