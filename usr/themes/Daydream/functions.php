@@ -175,8 +175,17 @@ function showUserAgent($ua) {
  */
 
 /**
- * 注册插件钩子，在Archive查询初始化时修改查询条件
- * 实现分类、标签、搜索筛选功能，使分页基于筛选后的结果
+ * Theme初始化函数，用于修改Archive查询
+ * 注意：Typecho的themeInit函数在Archive Widget初始化后调用
+ * 此时查询已经执行，所以这里主要用于其他初始化工作
+ */
+function themeInit($archive) {
+    // 可以在这里添加其他初始化逻辑
+}
+
+/**
+ * 在查询层应用筛选条件（分类、标签、搜索）
+ * 使用插件钩子 Widget_Archive_HandleInit 在查询执行前修改查询对象
  */
 Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $select) {
     // 只在archive页面应用筛选
@@ -190,26 +199,16 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
     $currentTags = $request->get('tags', '');
     $currentSearch = $request->get('search', '');
     
-    // 处理标签参数（逗号分隔）
-    $selectedTags = [];
-    if ($currentTags) {
-        $decodedTags = urldecode($currentTags);
-        $selectedTags = array_map('trim', explode(',', $decodedTags));
-        $selectedTags = array_filter($selectedTags);
-    }
-    
-    // 处理搜索关键词
-    $searchKeyword = $currentSearch ? urldecode($currentSearch) : null;
-    
     // 如果没有筛选条件，直接返回
-    if (!$currentCategory && empty($selectedTags) && !$searchKeyword) {
+    if (!$currentCategory && !$currentTags && !$currentSearch) {
         return;
     }
     
     $db = Typecho_Db::get();
-    $hasJoin = false;
+    $categoryMid = null;
+    $tagMids = [];
     
-    // 应用分类筛选
+    // 获取分类mid
     if ($currentCategory) {
         $category = $db->fetchRow($db->select('mid')
             ->from('table.metas')
@@ -218,55 +217,84 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
             ->limit(1));
         
         if ($category) {
-            $select->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-                ->where('table.relationships.mid = ?', $category['mid']);
-            $hasJoin = true;
+            $categoryMid = $category['mid'];
         }
     }
     
-    // 应用标签筛选（需要包含所有选中的标签）
-    if (!empty($selectedTags)) {
-        $tagMids = [];
-        foreach ($selectedTags as $tagName) {
-            $tag = $db->fetchRow($db->select('mid')
-                ->from('table.metas')
-                ->where('type = ?', 'tag')
-                ->where('name = ?', $tagName)
-                ->limit(1));
-            if ($tag) {
-                $tagMids[] = $tag['mid'];
+    // 获取标签mids
+    if ($currentTags) {
+        // 处理标签参数（逗号分隔）
+        $decodedTags = urldecode($currentTags);
+        $selectedTags = array_map('trim', explode(',', $decodedTags));
+        $selectedTags = array_filter($selectedTags);
+        
+        if (!empty($selectedTags)) {
+            foreach ($selectedTags as $tagName) {
+                $tag = $db->fetchRow($db->select('mid')
+                    ->from('table.metas')
+                    ->where('type = ?', 'tag')
+                    ->where('name = ?', $tagName)
+                    ->limit(1));
+                if ($tag) {
+                    $tagMids[] = $tag['mid'];
+                }
             }
         }
+    }
+    
+    // 如果同时有分类和标签筛选，先获取分类下的文章ID
+    $categoryPostIds = null;
+    if ($categoryMid !== null && !empty($tagMids)) {
+        $categoryPosts = $db->fetchAll($db->select('table.contents.cid')
+            ->from('table.contents')
+            ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+            ->where('table.relationships.mid = ?', $categoryMid)
+            ->where('table.contents.type = ?', 'post')
+            ->where('table.contents.status = ?', 'publish'));
         
-        if (!empty($tagMids)) {
-            // 使用子查询来实现标签筛选，避免主查询使用GROUP BY和HAVING的问题
-            // 对于多个标签，需要文章包含所有标签
-            // 使用EXISTS子查询来确保文章包含所有选中的标签
-            $tagCount = count($tagMids);
-            $tagMidsStr = implode(',', array_map('intval', $tagMids));
-            
-            $select->where('EXISTS (SELECT 1 FROM table.relationships r 
-                WHERE r.cid = table.contents.cid 
-                AND r.mid IN (' . $tagMidsStr . ')
-                GROUP BY r.cid
-                HAVING COUNT(DISTINCT r.mid) = ?)', $tagCount);
+        if (!empty($categoryPosts)) {
+            $categoryPostIds = array_column($categoryPosts, 'cid');
+        } else {
+            // 分类下没有文章，直接返回空结果
+            $select->where('1 = 0');
+            return;
+        }
+    }
+    
+    // 应用分类筛选（如果没有标签筛选，或者标签筛选时使用分类文章ID）
+    if ($categoryMid !== null && empty($tagMids)) {
+        $select->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+            ->where('table.relationships.mid = ?', $categoryMid);
+    }
+    
+    // 应用标签筛选（多标签AND逻辑）
+    if (!empty($tagMids)) {
+        if ($categoryPostIds !== null) {
+            // 同时有分类和标签，使用分类下的文章ID
+            $select->where('table.contents.cid IN ?', $categoryPostIds)
+                ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid IN ?', $tagMids)
+                ->group('table.contents.cid')
+                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+        } else {
+            // 只有标签筛选，直接JOIN并筛选标签
+            $select->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid IN ?', $tagMids)
+                ->group('table.contents.cid')
+                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
         }
     }
     
     // 应用搜索筛选
-    if ($searchKeyword) {
+    if ($currentSearch) {
+        $searchKeyword = urldecode($currentSearch);
         $searchPattern = '%' . $searchKeyword . '%';
         $select->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
     }
+    
+    // 确保只查询文章类型
+    $select->where('table.contents.type = ?', 'post');
 };
-
-/**
- * Theme初始化函数
- * 注意：筛选逻辑已通过插件钩子系统在查询执行前处理
- */
-function themeInit($archive) {
-    // 可以在这里添加其他初始化逻辑
-}
 
 /**
  * 判断是否为archive页面

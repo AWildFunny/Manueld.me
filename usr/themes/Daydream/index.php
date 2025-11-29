@@ -203,12 +203,12 @@ if (!$this->is('archive')) {
 }
 
 // 显示文章列表
-// 注意：筛选已在查询层面完成（通过functions.php中的插件钩子），
-// 所以这里直接显示查询结果即可，分页也会基于筛选后的结果
+// 注意：筛选逻辑已在查询层完成（functions.php中的handleInit钩子）
+// 这里直接显示查询结果即可，分页会自动正确计算
 
-$hasPosts = false;
+$displayedCount = 0;
 while ($this->next()): 
-    $hasPosts = true;
+    $displayedCount++;
     ?>
     <section itemscope itemtype="http://schema.org/BlogPosting">
         <?php if ($this->fields->headPic !=''): ?>
@@ -228,7 +228,7 @@ while ($this->next()):
 endwhile;
 
 // 如果没有显示任何文章且有筛选条件，显示提示
-if ($hasFilter && !$hasPosts):
+if ($hasFilter && $displayedCount === 0):
 ?>
     <section>
         <p style="text-align: center; color: var(--muted-color); padding: 40px 20px;">
