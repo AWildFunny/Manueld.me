@@ -185,23 +185,45 @@ function themeInit($archive) {
 
 /**
  * 在查询层应用筛选条件（分类、标签、搜索）
- * 使用插件钩子 Widget_Archive_HandleInit 在查询执行前修改查询对象
- * 同时优化 countSql 以确保分页计算正确
+ * 使用 query 钩子，它在 functions.php 加载后、查询执行前调用，可以修改查询对象
+ * 注意：需要在查询执行前修改 $select，同时也要修改 $archive->countSql
  */
-Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $select) {
-    // 只在archive页面应用筛选
-    if (!$archive->is('archive')) {
-        return;
-    }
-    
+Typecho_Plugin::factory('Widget_Archive')->query = function($archive, $select) {
     // 读取URL参数
     $request = Typecho_Request::getInstance();
     $currentCategory = $request->get('cat', '');
     $currentTags = $request->get('tags', '');
     $currentSearch = $request->get('search', '');
     
-    // 如果没有筛选条件，直接返回
+    // 如果没有筛选条件，需要手动执行默认查询
+    // 因为 query 钩子已注册，$queryPlugged 会被设置为 true，阻止默认查询执行
     if (!$currentCategory && !$currentTags && !$currentSearch) {
+        // 手动执行默认查询并推送结果，确保"全部"选项能正常显示文章
+        try {
+            $db = Typecho_Db::get();
+            $db->fetchAll($select, [$archive, 'push']);
+            // 返回 true 表示已经处理了查询，阻止默认查询执行
+            return true;
+        } catch (Exception $e) {
+            // 如果查询失败，返回 null 让默认查询执行（虽然可能不会执行）
+            return null;
+        }
+    }
+    
+    // 排除single类型页面（文章详情页、独立页面等不应该应用筛选）
+    $archiveType = $archive->parameter->type ?? '';
+    $singleTypes = ['single', 'page', 'post', 'attachment', 'comment_page'];
+    if (in_array($archiveType, $singleTypes)) {
+        return;
+    }
+    
+    // 检查是否有cid参数（single页面通常有cid参数）
+    if ($request->get('cid')) {
+        return;
+    }
+    
+    // 404页面也不应该应用筛选
+    if ($archiveType === '404') {
         return;
     }
     
@@ -258,141 +280,171 @@ Typecho_Plugin::factory('Widget_Archive')->handleInit = function($archive, $sele
         } else {
             // 分类下没有文章，直接返回空结果
             $select->where('1 = 0');
-            // 设置总数为0，确保分页计算正确
-            $archive->setTotal(0);
+            // 设置countSql也为空结果
+            $countSql = clone $select;
+            $archive->setCountSql($countSql);
             return;
         }
     }
     
-    // 应用分类筛选（如果没有标签筛选，或者标签筛选时使用分类文章ID）
-    if ($categoryMid !== null && empty($tagMids)) {
-        $select->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-            ->where('table.relationships.mid = ?', $categoryMid);
+    // 获取符合条件的文章ID（用于主查询）
+    // 对于标签筛选，需要先获取同时拥有所有指定标签的文章ID
+    $mainFilteredPostIds = null;
+    
+    if (!empty($tagMids)) {
+        // 对于标签筛选，需要先获取同时拥有所有指定标签的文章ID
+        $tagPostIds = $db->fetchAll($db->select('table.relationships.cid')
+            ->from('table.relationships')
+            ->where('table.relationships.mid IN ?', $tagMids)
+            ->group('table.relationships.cid')
+            ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids)));
+        
+        if (!empty($tagPostIds)) {
+            $tagPostIdArray = array_column($tagPostIds, 'cid');
+            
+            if ($categoryPostIds !== null) {
+                // 同时有分类和标签，取交集
+                $mainFilteredPostIds = array_intersect($categoryPostIds, $tagPostIdArray);
+            } else {
+                // 只有标签筛选
+                $mainFilteredPostIds = $tagPostIdArray;
+            }
+        } else {
+            // 没有符合条件的文章
+            $mainFilteredPostIds = [];
+        }
+    } else if ($categoryPostIds !== null) {
+        // 只有分类筛选
+        $mainFilteredPostIds = $categoryPostIds;
     }
     
-    // 应用标签筛选（多标签AND逻辑）
-    if (!empty($tagMids)) {
-        if ($categoryPostIds !== null) {
-            // 同时有分类和标签，使用分类下的文章ID
-            $select->where('table.contents.cid IN ?', $categoryPostIds)
-                ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-                ->where('table.relationships.mid IN ?', $tagMids)
-                ->group('table.contents.cid')
-                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+    // 应用筛选条件到主查询
+    if ($mainFilteredPostIds !== null) {
+        if (empty($mainFilteredPostIds)) {
+            // 没有符合条件的文章，设置空结果
+            $select->where('1 = 0');
         } else {
-            // 只有标签筛选，直接JOIN并筛选标签
-            $select->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-                ->where('table.relationships.mid IN ?', $tagMids)
-                ->group('table.contents.cid')
-                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+            // 使用IN查询，避免JOIN和GROUP BY
+            $select->where('table.contents.cid IN ?', $mainFilteredPostIds);
+        }
+    } else {
+        // 没有标签筛选，只有分类筛选
+        if ($categoryMid !== null) {
+            // 先获取分类下的文章ID，然后使用IN查询（避免JOIN冲突）
+            $categoryPosts = $db->fetchAll($db->select('table.contents.cid')
+                ->from('table.contents')
+                ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid = ?', $categoryMid)
+                ->where('table.contents.type = ?', 'post')
+                ->where('table.contents.status = ?', 'publish'));
+            
+            if (!empty($categoryPosts)) {
+                $categoryPostIds = array_column($categoryPosts, 'cid');
+                // 应用筛选条件到主查询
+                $select->where('table.contents.cid IN ?', $categoryPostIds);
+            } else {
+                // 分类下没有文章，设置空结果
+                $select->where('1 = 0');
+            }
         }
     }
     
-    // 应用搜索筛选
+    // 应用搜索筛选（搜索筛选总是需要应用到主查询）
     if ($currentSearch) {
         $searchKeyword = urldecode($currentSearch);
         $searchPattern = '%' . $searchKeyword . '%';
         $select->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
     }
     
-    // 确保只查询文章类型
-    $select->where('table.contents.type = ?', 'post');
+    // 构建专门用于计数的查询（不使用GROUP BY）
+    // Typecho的size()方法会使用COUNT(DISTINCT table.contents.cid)，所以我们需要确保countSql包含正确的JOIN和WHERE条件
+    // 但对于多标签AND逻辑，我们需要先获取符合条件的文章ID，然后使用IN查询
     
-    // 手动计算筛选后的文章总数，确保分页计算正确
-    // 使用与 index.php 中相同的计数逻辑，确保一致性
-    try {
-        $countSelect = $db->select('COUNT(DISTINCT table.contents.cid) as cnt')
-            ->from('table.contents')
-            ->where('table.contents.type = ?', 'post')
-            ->where('table.contents.status = ?', 'publish');
+    // 获取符合条件的文章ID（用于计数查询）
+    // 注意：搜索筛选需要在计数查询中应用，因为搜索是基于标题和内容的，不能预先获取ID
+    $filteredPostIds = null;
+    
+    if (!empty($tagMids)) {
+        // 对于标签筛选，需要先获取同时拥有所有指定标签的文章ID
+        $tagPostIds = $db->fetchAll($db->select('table.relationships.cid')
+            ->from('table.relationships')
+            ->where('table.relationships.mid IN ?', $tagMids)
+            ->group('table.relationships.cid')
+            ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids)));
         
-        // 应用分类筛选
-        if ($categoryPostIds !== null) {
-            // 同时有分类和标签筛选，使用分类下的文章ID
-            $countSelect->where('table.contents.cid IN ?', $categoryPostIds);
-        } elseif ($categoryMid !== null) {
-            // 只有分类筛选
-            $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-                ->where('table.relationships.mid = ?', $categoryMid);
-        }
-        
-        // 应用标签筛选（多标签AND逻辑）
-        if (!empty($tagMids)) {
-            // 只有在没有 JOIN 的情况下才需要 JOIN
-            // 如果 $categoryMid !== null，前面已经 JOIN 了
-            // 如果 $categoryPostIds !== null，前面使用 IN 没有 JOIN，需要 JOIN
-            if ($categoryPostIds !== null || ($categoryPostIds === null && $categoryMid === null)) {
-                // 需要 JOIN：要么是使用 IN 的情况，要么是完全没有分类筛选
-                $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid');
-            }
-            // 如果 $categoryMid !== null，前面已经 JOIN 了，不需要再次 JOIN
+        if (!empty($tagPostIds)) {
+            $tagPostIdArray = array_column($tagPostIds, 'cid');
             
-            $countSelect->where('table.relationships.mid IN ?', $tagMids)
-                ->group('table.contents.cid')
-                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
-        }
-        
-        // 应用搜索筛选
-        if ($currentSearch) {
-            $searchKeyword = urldecode($currentSearch);
-            $searchPattern = '%' . $searchKeyword . '%';
-            $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
-        }
-        
-        // 执行计数查询
-        // 注意：当有 GROUP BY 时，COUNT(DISTINCT cid) 会返回每个分组的计数（都是1）
-        // 我们需要先获取分组后的文章ID，然后计算数量
-        if (!empty($tagMids)) {
-            // 对于标签筛选，需要先获取分组后的文章ID，然后计数
-            // 重新构建查询，选择 cid 而不是 COUNT
-            $groupedSelect = $db->select('table.contents.cid')
-                ->from('table.contents')
-                ->where('table.contents.type = ?', 'post')
-                ->where('table.contents.status = ?', 'publish');
-            
-            // 应用分类筛选
             if ($categoryPostIds !== null) {
-                $groupedSelect->where('table.contents.cid IN ?', $categoryPostIds);
-            } elseif ($categoryMid !== null) {
-                $groupedSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-                    ->where('table.relationships.mid = ?', $categoryMid);
+                // 同时有分类和标签，取交集
+                $filteredPostIds = array_intersect($categoryPostIds, $tagPostIdArray);
+            } else {
+                // 只有标签筛选
+                $filteredPostIds = $tagPostIdArray;
             }
-            
-            // 应用标签筛选
-            // 只有在没有 JOIN 的情况下才需要 JOIN
-            // 如果 $categoryMid !== null，前面已经 JOIN 了
-            // 如果 $categoryPostIds !== null，前面使用 IN 没有 JOIN，需要 JOIN
-            if ($categoryPostIds !== null || ($categoryPostIds === null && $categoryMid === null)) {
-                // 需要 JOIN：要么是使用 IN 的情况，要么是完全没有分类筛选
-                $groupedSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid');
-            }
-            // 如果 $categoryMid !== null，前面已经 JOIN 了，不需要再次 JOIN
-            
-            $groupedSelect->where('table.relationships.mid IN ?', $tagMids)
-                ->group('table.contents.cid')
-                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
-            
-            // 应用搜索筛选
-            if ($currentSearch) {
-                $searchKeyword = urldecode($currentSearch);
-                $searchPattern = '%' . $searchKeyword . '%';
-                $groupedSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
-            }
-            
-            // 获取所有匹配的文章ID，然后计算数量
-            $groupedPosts = $db->fetchAll($groupedSelect);
-            $total = count($groupedPosts);
         } else {
-            // 没有标签筛选，直接使用 COUNT(DISTINCT)
-            $result = $db->fetchObject($countSelect);
-            $total = $result ? intval($result->cnt) : 0;
+            // 没有符合条件的文章
+            $filteredPostIds = [];
         }
-        
-        // 直接设置总数，这样 getTotal() 方法会直接返回这个值，不会调用 size()
-        $archive->setTotal($total);
+    } else if ($categoryPostIds !== null) {
+        // 只有分类筛选
+        $filteredPostIds = $categoryPostIds;
+    }
+    
+    // 构建计数查询
+    $countSelect = $archive->select()
+        ->where('table.contents.type = ?', 'post')
+        ->where('table.contents.status = ?', 'publish');
+    
+    // 如果有筛选后的文章ID（分类+标签），直接使用IN查询（避免JOIN和GROUP BY）
+    if ($filteredPostIds !== null) {
+        if (empty($filteredPostIds)) {
+            // 没有符合条件的文章，设置空结果
+            $countSelect->where('1 = 0');
+        } else {
+            $countSelect->where('table.contents.cid IN ?', $filteredPostIds);
+        }
+    } else {
+        // 没有标签筛选，只有分类或搜索筛选
+        if ($categoryMid !== null) {
+            // 先获取分类下的文章ID，然后使用IN查询（与主查询保持一致）
+            $categoryPosts = $db->fetchAll($db->select('table.contents.cid')
+                ->from('table.contents')
+                ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                ->where('table.relationships.mid = ?', $categoryMid)
+                ->where('table.contents.type = ?', 'post')
+                ->where('table.contents.status = ?', 'publish'));
+            
+            if (!empty($categoryPosts)) {
+                $categoryPostIds = array_column($categoryPosts, 'cid');
+                $countSelect->where('table.contents.cid IN ?', $categoryPostIds);
+            } else {
+                // 分类下没有文章，设置空结果
+                $countSelect->where('1 = 0');
+            }
+        }
+    }
+    
+    // 应用搜索筛选到计数查询（搜索筛选总是需要应用到计数查询）
+    if ($currentSearch) {
+        $searchKeyword = urldecode($currentSearch);
+        $searchPattern = '%' . $searchKeyword . '%';
+        $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+    }
+    
+    // 设置countSql，确保分页计算正确
+    $archive->setCountSql($countSelect);
+    
+    // 手动执行查询并推送结果
+    // 因为 Typecho 的 query 钩子机制，如果钩子返回非空值，默认查询不会执行
+    // 我们需要手动执行查询并推送结果到 Archive 对象
+    try {
+        $db->fetchAll($select, [$archive, 'push']);
+        // 返回 true 表示已经处理了查询，阻止默认查询执行
+        return true;
     } catch (Exception $e) {
-        // 如果计数查询失败，回退到让 Typecho 自动处理
-        // countSql 会在 execute() 方法中自动设置
+        // 如果手动查询失败，返回 null 让默认查询执行
+        return null;
     }
 };
 
