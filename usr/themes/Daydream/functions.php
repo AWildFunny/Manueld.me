@@ -39,12 +39,8 @@ function themeConfig($form) {
 
 /**
  * 在后台footer中添加分类隐藏功能的JavaScript
+ * 注意：主题的functions.php可能不会在后台页面加载，所以需要在admin/category.php中直接引用脚本
  */
-Typecho_Plugin::factory('admin/footer.php')->end = function() {
-    $options = Helper::options();
-    $themeUrl = $options->themeUrl;
-    echo '<script src="' . $themeUrl . '/assets/js/admin-category-hidden.js"></script>';
-};
 
 function themeFields($layout) {
     $headPic = new Typecho_Widget_Helper_Form_Element_Text('headPic', NULL, NULL, '文章头图地址', '仅对文章有效。在这里填入一个图片 URL 地址, 就可以让文章加上头图。留空则不显示头图。');

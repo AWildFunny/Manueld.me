@@ -19,5 +19,8 @@ include 'menu.php';
 include 'copyright.php';
 include 'common-js.php';
 include 'form-js.php';
+// 添加分类隐藏功能的JavaScript
+$themeUrl = $options->themeUrl;
+echo '<script src="' . $themeUrl . '/assets/js/admin-category-hidden.js"></script>';
 include 'footer.php';
 ?>
