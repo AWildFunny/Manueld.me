@@ -752,14 +752,32 @@ footer a {
     font-style: italic;
 }
 
+.tag-show-more {
+    display: inline-block;
+    padding: 4px 8px;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.425rem;
+    text-decoration: underline;
+    margin-top: 8px;
+    margin-left: 8px;
+    transition: color 0.2s;
+    white-space: nowrap;
+}
+
+.tag-show-more:hover {
+    color: #1976d2;
+    text-decoration: underline;
+}
+
 .tag-bubble {
-    padding: 8px 16px;
+    padding: 4px 8px;
     background: #f8f9fa;
     border: 1.5px solid #e0e0e0;
     border-radius: 24px;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    font-size: 0.85rem;
+    font-size: 0.425rem;
     color: #555;
     display: inline-flex;
     align-items: center;
@@ -808,18 +826,18 @@ footer a {
 }
 
 .tag-bubble.size-small {
-    font-size: 0.8rem;
-    padding: 5px 12px;
+    font-size: 0.4rem;
+    padding: 2.5px 6px;
 }
 
 .tag-bubble.size-medium {
-    font-size: 0.85rem;
-    padding: 6px 14px;
+    font-size: 0.425rem;
+    padding: 3px 7px;
 }
 
 .tag-bubble.size-large {
-    font-size: 0.9rem;
-    padding: 7px 16px;
+    font-size: 0.45rem;
+    padding: 3.5px 8px;
     font-weight: 600;
 }
 
@@ -943,8 +961,8 @@ footer a {
     }
     
     .tag-bubble {
-        padding: 6px 12px;
-        font-size: 0.8rem;
+        padding: 3px 6px;
+        font-size: 0.4rem;
     }
     
     .tag-cloud-empty {

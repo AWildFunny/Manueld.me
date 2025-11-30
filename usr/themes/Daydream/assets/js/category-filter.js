@@ -79,6 +79,66 @@
         }
     }
     
+    // 根据屏幕大小获取标签显示阈值
+    function getTagThreshold() {
+        const width = window.innerWidth;
+        // 移动端 (< 576px): 8个标签
+        // 平板 (576px - 992px): 15个标签
+        // 桌面 (> 992px): 25个标签
+        if (width < 576) {
+            return 8;
+        } else if (width < 992) {
+            return 15;
+        } else {
+            return 25;
+        }
+    }
+    
+    // 初始化标签折叠功能
+    function initTagCollapse() {
+        const $tagCloud = $('#filter-tag-cloud');
+        if (!$tagCloud.length) {
+            return;
+        }
+        
+        const $tags = $tagCloud.find('.tag-bubble');
+        const totalTags = $tags.length;
+        const threshold = getTagThreshold();
+        
+        // 如果标签数量不超过阈值，不需要折叠
+        if (totalTags <= threshold) {
+            return;
+        }
+        
+        // 移除之前的"显示全部"按钮
+        $tagCloud.find('.tag-show-more').remove();
+        
+        // 隐藏超出阈值的标签
+        $tags.each(function(index) {
+            if (index >= threshold) {
+                $(this).hide();
+            } else {
+                $(this).show();
+            }
+        });
+        
+        // 添加"显示全部"按钮
+        const $showMore = $('<span class="tag-show-more">点击显示全部标签</span>');
+        $tagCloud.append($showMore);
+        
+        // 点击"显示全部"按钮
+        $showMore.on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 显示所有标签
+            $tags.show();
+            
+            // 移除"显示全部"按钮
+            $(this).remove();
+        });
+    }
+    
     // 初始化筛选组件
     function initCategoryFilter() {
         const $wrapper = $('.filter-wrapper');
@@ -90,6 +150,18 @@
         let currentCategory = params.cat;
         let currentTags = params.tags ? params.tags.split(',').map(t => decodeURIComponent(t.trim())).filter(t => t) : [];
         let currentSearch = params.search ? decodeURIComponent(params.search) : '';
+        
+        // 初始化标签折叠
+        initTagCollapse();
+        
+        // 窗口大小改变时重新初始化标签折叠
+        let resizeTimeout;
+        $(window).on('resize', function() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(function() {
+                initTagCollapse();
+            }, 300);
+        });
         
         // 分类点击事件
         $wrapper.on('click', '.category-tab', function(e) {
@@ -187,6 +259,10 @@
     $(document).on('pjax:complete', function() {
         initCategoryFilter();
         updatePaginationLinks();
+        // 重新初始化标签折叠（因为Pjax会重新加载内容）
+        setTimeout(function() {
+            initTagCollapse();
+        }, 100);
     });
     
     // 更新分页链接，添加筛选参数

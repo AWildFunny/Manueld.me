@@ -37,6 +37,15 @@ function themeConfig($form) {
     $form->addInput($cunstomCSS);
 }
 
+/**
+ * 在后台footer中添加分类隐藏功能的JavaScript
+ */
+Typecho_Plugin::factory('admin/footer.php')->end = function() {
+    $options = Helper::options();
+    $themeUrl = $options->themeUrl;
+    echo '<script src="' . $themeUrl . '/assets/js/admin-category-hidden.js"></script>';
+};
+
 function themeFields($layout) {
     $headPic = new Typecho_Widget_Helper_Form_Element_Text('headPic', NULL, NULL, '文章头图地址', '仅对文章有效。在这里填入一个图片 URL 地址, 就可以让文章加上头图。留空则不显示头图。');
     $layout->addItem($headPic);
@@ -499,7 +508,19 @@ function getCategoriesWithIcons() {
     $result = [];
     
     while ($categories->next()) {
-        $icon = $categories->description ?: '📁'; // 从描述字段读取图标，默认为📁
+        // 检查是否隐藏（description以__HIDDEN__开头）
+        $description = $categories->description ?: '';
+        $isHidden = (strpos($description, '__HIDDEN__') === 0);
+        
+        // 如果隐藏，跳过此分类
+        if ($isHidden) {
+            continue;
+        }
+        
+        // 从描述字段读取图标，默认为📁
+        // 注意：如果description以__HIDDEN__开头，已经被过滤掉了，所以这里直接使用
+        $icon = $description ?: '📁';
+        
         $result[] = [
             'mid' => $categories->mid,
             'name' => $categories->name,
