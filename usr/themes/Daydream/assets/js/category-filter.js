@@ -172,12 +172,16 @@
             // 更新当前分类
             currentCategory = category;
             
+            // 切换分类时清除已选择的标签
+            currentTags = [];
+            
             // 更新UI
             $wrapper.find('.category-tab').removeClass('active');
             $tab.addClass('active');
+            $wrapper.find('.tag-bubble').removeClass('active');
             
-            // 更新URL
-            updateFilter(currentCategory, currentTags, currentSearch, 1);
+            // 更新URL（清除标签参数）
+            updateFilter(currentCategory, [], currentSearch, 1);
         });
         
         // 标签点击事件（多选）
