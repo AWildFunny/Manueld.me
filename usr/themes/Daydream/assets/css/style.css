@@ -741,6 +741,7 @@ footer a {
     min-height: 32px;
     margin-top: 12px;
     margin-bottom: 0;
+    padding-bottom: 60px; /* 为右下角的 result-stats 留出空间，避免重叠 */
 }
 
 .tag-cloud-empty {
@@ -958,6 +959,7 @@ footer a {
         margin-top: 12px;
         margin-bottom: 0;
         gap: 6px;
+        padding-bottom: 0; /* 移动端 result-stats 是 static，不需要额外空间 */
     }
     
     .tag-bubble {

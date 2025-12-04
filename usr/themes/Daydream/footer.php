@@ -8,11 +8,30 @@
         $("main pre").addClass("shadow rounded");
         $(".aplayer").addClass("shadow rounded");
         
-        // 折叠内容功能
-        $('.fold-header').on('click', function() {
-            var $container = $(this).closest('.fold-container');
-            $container.toggleClass('active');
-        });
+        // 折叠内容功能（支持移动端触摸事件）
+        function initFoldToggle() {
+            $('.fold-header').off('click touchend').on('touchend', function(e) {
+                var $header = $(this);
+                // 标记该元素已处理触摸事件
+                $header.data('touch-handled', true);
+                e.preventDefault();
+                var $container = $header.closest('.fold-container');
+                $container.toggleClass('active');
+                // 300ms后重置标志，避免阻止后续的click事件
+                setTimeout(function() {
+                    $header.data('touch-handled', false);
+                }, 300);
+            }).on('click', function(e) {
+                var $header = $(this);
+                // 如果已经处理了触摸事件，则忽略click事件
+                if ($header.data('touch-handled')) {
+                    return false;
+                }
+                var $container = $header.closest('.fold-container');
+                $container.toggleClass('active');
+            });
+        }
+        initFoldToggle();
     });
     /*
      * Fancybox settings
@@ -70,11 +89,30 @@
                 }
             }
         }
-        // 重新初始化折叠内容功能
-        $('.fold-header').off('click').on('click', function() {
-            var $container = $(this).closest('.fold-container');
-            $container.toggleClass('active');
-        });
+        // 重新初始化折叠内容功能（支持移动端触摸事件）
+        function initFoldToggle() {
+            $('.fold-header').off('click touchend').on('touchend', function(e) {
+                var $header = $(this);
+                // 标记该元素已处理触摸事件
+                $header.data('touch-handled', true);
+                e.preventDefault();
+                var $container = $header.closest('.fold-container');
+                $container.toggleClass('active');
+                // 300ms后重置标志，避免阻止后续的click事件
+                setTimeout(function() {
+                    $header.data('touch-handled', false);
+                }, 300);
+            }).on('click', function(e) {
+                var $header = $(this);
+                // 如果已经处理了触摸事件，则忽略click事件
+                if ($header.data('touch-handled')) {
+                    return false;
+                }
+                var $container = $header.closest('.fold-container');
+                $container.toggleClass('active');
+            });
+        }
+        initFoldToggle();
     });
 </script>
 

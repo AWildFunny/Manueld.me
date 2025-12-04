@@ -145,7 +145,7 @@ if ($this->is('archive')):
                 <input type="text" 
                        class="search-input" 
                        id="filter-search-input"
-                       placeholder="在筛选结果中搜索文章标题或内容..." 
+                       placeholder="选择下方标签，或在此输入以筛选文章..." 
                        value="<?php echo htmlspecialchars($searchKeyword ?: ''); ?>">
             </div>
             
