@@ -53,12 +53,12 @@ if ($this->is('archive')):
     if ($currentCategory || !empty($selectedTags) || $searchKeyword) {
         // 如果有筛选条件，需要重新计算
         $db = Typecho_Db::get();
-        $countSelect = $db->select('COUNT(DISTINCT table.contents.cid) as cnt')
-            ->from('table.contents')
-            ->where('table.contents.type = ?', 'post')
-            ->where('table.contents.status = ?', 'publish');
+        $categoryMid = null;
+        $categoryPostIds = null;
+        $tagMids = [];
+        $filteredPostIds = null;
         
-        // 应用分类筛选
+        // 获取分类mid
         if ($currentCategory) {
             $category = $db->fetchRow($db->select('mid')
                 ->from('table.metas')
@@ -67,14 +67,25 @@ if ($this->is('archive')):
                 ->limit(1));
             
             if ($category) {
-                $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid')
-                    ->where('table.relationships.mid = ?', $category['mid']);
+                $categoryMid = $category['mid'];
+                // 获取分类下的文章ID
+                $categoryPosts = $db->fetchAll($db->select('table.contents.cid')
+                    ->from('table.contents')
+                    ->join('table.relationships', 'table.contents.cid = table.relationships.cid')
+                    ->where('table.relationships.mid = ?', $categoryMid)
+                    ->where('table.contents.type = ?', 'post')
+                    ->where('table.contents.status = ?', 'publish'));
+                
+                if (!empty($categoryPosts)) {
+                    $categoryPostIds = array_column($categoryPosts, 'cid');
+                } else {
+                    $categoryPostIds = [];
+                }
             }
         }
         
-        // 应用标签筛选
+        // 获取标签mids
         if (!empty($selectedTags)) {
-            $tagMids = [];
             foreach ($selectedTags as $tagName) {
                 $tag = $db->fetchRow($db->select('mid')
                     ->from('table.metas')
@@ -85,28 +96,77 @@ if ($this->is('archive')):
                     $tagMids[] = $tag['mid'];
                 }
             }
+        }
+        
+        // 获取符合条件的文章ID（标签筛选需要AND逻辑）
+        if (!empty($tagMids)) {
+            $tagPostIds = $db->fetchAll($db->select('table.relationships.cid')
+                ->from('table.relationships')
+                ->where('table.relationships.mid IN ?', $tagMids)
+                ->group('table.relationships.cid')
+                ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids)));
             
-            if (!empty($tagMids)) {
-                if (!$currentCategory) {
-                    $countSelect->join('table.relationships', 'table.contents.cid = table.relationships.cid');
+            if (!empty($tagPostIds)) {
+                $tagPostIdArray = array_column($tagPostIds, 'cid');
+                
+                if ($categoryPostIds !== null) {
+                    // 同时有分类和标签，取交集
+                    $filteredPostIds = array_intersect($categoryPostIds, $tagPostIdArray);
+                } else {
+                    // 只有标签筛选
+                    $filteredPostIds = $tagPostIdArray;
                 }
-                $countSelect->where('table.relationships.mid IN ?', $tagMids)
-                    ->group('table.contents.cid')
-                    ->having('COUNT(DISTINCT table.relationships.mid) = ?', count($tagMids));
+            } else {
+                // 没有符合条件的文章
+                $filteredPostIds = [];
             }
+        } else if ($categoryPostIds !== null) {
+            // 只有分类筛选
+            $filteredPostIds = $categoryPostIds;
         }
         
-        // 应用搜索筛选
-        if ($searchKeyword) {
-            $searchPattern = '%' . $searchKeyword . '%';
-            $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
-        }
+        // 构建计数查询
+        $countSelect = $db->select('COUNT(DISTINCT table.contents.cid) as cnt')
+            ->from('table.contents')
+            ->where('table.contents.type = ?', 'post')
+            ->where('table.contents.status = ?', 'publish');
         
-        try {
-            $result = $db->fetchObject($countSelect);
-            $filteredPostCount = $result ? intval($result->cnt) : 0;
-        } catch (Exception $e) {
-            $filteredPostCount = $totalPosts;
+        // 如果有筛选后的文章ID（分类+标签），直接使用IN查询
+        if ($filteredPostIds !== null) {
+            if (empty($filteredPostIds)) {
+                // 没有符合条件的文章
+                $filteredPostCount = 0;
+            } else {
+                $countSelect->where('table.contents.cid IN ?', $filteredPostIds);
+                // 应用搜索筛选（如果有）
+                if ($searchKeyword) {
+                    $searchPattern = '%' . $searchKeyword . '%';
+                    $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+                }
+                
+                try {
+                    $result = $db->fetchObject($countSelect);
+                    $filteredPostCount = $result ? intval($result->cnt) : 0;
+                } catch (Exception $e) {
+                    $filteredPostCount = 0;
+                }
+            }
+        } else {
+            // 没有标签和分类筛选，只有搜索筛选
+            if ($searchKeyword) {
+                $searchPattern = '%' . $searchKeyword . '%';
+                $countSelect->where('(table.contents.title LIKE ? OR table.contents.text LIKE ?)', $searchPattern, $searchPattern);
+                
+                try {
+                    $result = $db->fetchObject($countSelect);
+                    $filteredPostCount = $result ? intval($result->cnt) : 0;
+                } catch (Exception $e) {
+                    $filteredPostCount = $totalPosts;
+                }
+            } else {
+                // 没有筛选条件，使用总数
+                $filteredPostCount = $totalPosts;
+            }
         }
     }
 ?>
