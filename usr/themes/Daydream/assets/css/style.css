@@ -754,21 +754,30 @@ footer a {
 }
 
 .tag-show-more {
-    display: inline-block;
-    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+    padding: 3.75px 9px;
     color: var(--primary);
     cursor: pointer;
-    font-size: 0.6375rem;
+    font-size: 0.6rem;
+    font-weight: 500;
     text-decoration: underline;
-    margin-top: 8px;
-    margin-left: 8px;
     transition: color 0.2s;
     white-space: nowrap;
+    border-radius: 24px;
+    background: #f8f9fa;
+    border: 1.5px solid #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    user-select: none;
 }
 
 .tag-show-more:hover {
     color: #1976d2;
     text-decoration: underline;
+    background: #e8f4fd;
+    border-color: #90caf9;
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(30, 136, 229, 0.15);
 }
 
 .tag-bubble {
@@ -963,6 +972,11 @@ footer a {
     }
     
     .tag-bubble {
+        padding: 4.5px 9px;
+        font-size: 0.6rem;
+    }
+    
+    .tag-show-more {
         padding: 4.5px 9px;
         font-size: 0.6rem;
     }
