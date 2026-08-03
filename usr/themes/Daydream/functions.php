@@ -54,9 +54,21 @@ function themeFields($layout) {
 
     $linkTo = new Typecho_Widget_Helper_Form_Element_Text('linkTo', NULL, NULL, '重定向至', '在这里输入一个 URL，打开该页面或文章时会自动重定向到这个 URL，可以用于定制菜单栏。留空则不重定向。');
     $layout->addItem($linkTo);
+
+    $articleTemplate = new Typecho_Widget_Helper_Form_Element_Select(
+        'articleTemplate',
+        array(
+            'default' => '默认文章',
+            'music-album' => '音乐相册'
+        ),
+        'default',
+        '文章模板',
+        '选择「音乐相册」时，文章将以章节形式展示：每个 ## 标题为一章，并显示 sticky 章节目录。'
+    );
+    $layout->addItem($articleTemplate);
 }
 
-function exContent($content){
+function exContent($content, $skipToc = false){
 
     // 文章内短代码
     $pattern = '/\[(info)\](.*?)\[\s*\/\1\s*\]/';
@@ -81,8 +93,8 @@ function exContent($content){
         </div>';
     }, $content);
 
-    // 文章 TOC 功能
-    if (preg_match_all('/<h(\d)>(.*)<\/h\d>/isU', $content, $outarr)){
+    // 文章 TOC 功能（音乐相册模板由 exContentAlbum 单独处理章节导航）
+    if (!$skipToc && preg_match_all('/<h(\d)>(.*)<\/h\d>/isU', $content, $outarr)){
         $toc_out = "";
         $minlevel = 6;
         for ($key=0; $key<count($outarr[2]); $key++) $minlevel = min($minlevel, $outarr[1][$key]);
@@ -108,6 +120,58 @@ function exContent($content){
     $content = preg_replace("/<img src=\"([^\"]*)\" alt=\"([^\"]*)\" title=\"([^\"]*)\">/i", "<a data-fancybox=\"gallery\" href=\"\\1\" data-caption=\"\\3\"><img src=\"\\1\" alt=\"\\2\" title=\"\\3\"></a>", $content);
 
     return $content;
+}
+
+/**
+ * 音乐相册文章内容：按 h2 分章 + sticky 章节目录结构
+ */
+function exContentAlbum($content) {
+    $content = exContent($content, true);
+
+    if (!preg_match('/<h2[\s>]/i', $content)) {
+        return '<div class="music-album-body">' . $content . '</div>';
+    }
+
+    $parts = preg_split('/(?=<h2[\s>])/i', $content, -1, PREG_SPLIT_NO_EMPTY);
+    $navItems = '';
+    $sections = '';
+    $index = 0;
+
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if ($part === '') {
+            continue;
+        }
+
+        if (preg_match('/^<h2(\s[^>]*)?>(.*?)<\/h2>/is', $part, $match)) {
+            $title = strip_tags($match[2]);
+            $titleEsc = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+            $chapterId = 'music-album-ch-' . $index;
+
+            $part = preg_replace(
+                '/^<h2(\s[^>]*)?>/i',
+                '<h2 id="' . $chapterId . '-title"$1>',
+                $part,
+                1
+            );
+
+            $navItems .= '<li><a class="music-album-nav-link" href="#' . $chapterId . '" data-chapter="' . $index . '">' . $titleEsc . '</a></li>';
+            $sections .= '<section class="music-album-chapter" id="' . $chapterId . '" data-chapter="' . $index . '" aria-labelledby="' . $chapterId . '-title">' . $part . '</section>';
+            $index++;
+        } else {
+            $sections .= '<div class="music-album-intro">' . $part . '</div>';
+        }
+    }
+
+    if ($index === 0) {
+        return '<div class="music-album-body">' . $content . '</div>';
+    }
+
+    $nav = '<nav class="music-album-nav" aria-label="章节导航">';
+    $nav .= '<p class="music-album-nav-label"><i class="czs-music-l"></i> 章节</p>';
+    $nav .= '<ol class="music-album-nav-list">' . $navItems . '</ol></nav>';
+
+    return '<div class="music-album-layout">' . $nav . '<div class="music-album-body">' . $sections . '</div></div>';
 }
 
 // 来自插件 WordsCounter
