@@ -1,486 +1,496 @@
 <?php
 /**
- * 在博客文章中嵌入自定义音乐播放器组件，支持手动播放功能
- * 这是一个Typecho插件，允许在文章中使用短代码插入音乐播放器
+ * 文章内嵌唱片式音乐播放器，支持环形进度、悬浮迷你条、进页提示、自定义/网易云插入
+ *
  * @package CustomMusicPlayer
- * @version 1.1.3
- * @link http://your-website.com
+ * @version 2.2.4
  * @dependence 9.9.2-*
  */
 
+if (!defined('__TYPECHO_ROOT_DIR__')) exit;
+
 class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
 {
-    /**
-     * 激活插件方法, 如果激活失败, 直接抛出异常
-     * 该方法会将音乐播放器相关功能挂载到Typecho系统中
-     * 
-     * @access public
-     * @return void
-     * @throws Typecho_Plugin_Exception
-     */
+    /** @var bool */
+    private static $needsAssets = false;
+
     public static function activate()
     {
-        // 将parse方法挂载到内容扩展点，用于处理文章内容中的短代码
         Typecho_Plugin::factory('Widget_Abstract_Contents')->contentEx = array('CustomMusicPlayer_Plugin', 'parse');
-        // 在页面头部输出CSS
         Typecho_Plugin::factory('Widget_Archive')->header = array('CustomMusicPlayer_Plugin', 'header');
-        // 在页面底部输出JavaScript
         Typecho_Plugin::factory('Widget_Archive')->footer = array('CustomMusicPlayer_Plugin', 'footer');
+
+        Typecho_Plugin::factory('admin/write-post.php')->option = array('CustomMusicPlayer_Plugin', 'adminOption');
+        Typecho_Plugin::factory('admin/write-post.php')->bottom = array('CustomMusicPlayer_Plugin', 'adminBottom');
+        Typecho_Plugin::factory('admin/write-page.php')->option = array('CustomMusicPlayer_Plugin', 'adminOption');
+        Typecho_Plugin::factory('admin/write-page.php')->bottom = array('CustomMusicPlayer_Plugin', 'adminBottom');
     }
-    
+
+    public static function deactivate() {}
+
+    public static function config(Typecho_Widget_Helper_Form $form)
+    {
+        $api = new Typecho_Widget_Helper_Form_Element_Text(
+            'metingApi',
+            null,
+            'https://meting.mikus.ink/api?server=:server&type=:type&id=:id',
+            'Meting API 地址',
+            '用于解析网易云等平台。占位符：<code>:server</code> <code>:type</code> <code>:id</code>。第三方接口可能失效，可自行部署后替换。'
+        );
+        $form->addInput($api);
+
+        $hint = new Typecho_Widget_Helper_Form_Element_Text(
+            'playerHint',
+            null,
+            '点按唱片播放 · 拖动外环调节进度',
+            '播放器备注文案',
+            '显示在曲名/艺术家下方的灰色提示。留空则不显示。单条短代码可用 <code>hint="..."</code> 覆盖。'
+        );
+        $form->addInput($hint);
+    }
+
+    public static function personalConfig(Typecho_Widget_Helper_Form $form) {}
+
     /**
-     * 禁用插件方法, 如果禁用失败, 直接抛出异常
-     * 该方法用于禁用插件时清理挂载点
-     * 
-     * @static
-     * @access public
-     * @return void
-     * @throws Typecho_Plugin_Exception
-     */
-    public static function deactivate(){}
-    
-    /**
-     * 获取插件配置面板
-     * 该方法用于在Typecho后台生成插件的配置界面
-     * 
-     * @access public
-     * @param Typecho_Widget_Helper_Form $form 配置面板
-     * @return void
-     */
-    public static function config(Typecho_Widget_Helper_Form $form){}
-    
-    /**
-     * 个人用户的配置面板
-     * 该方法用于设置用户个性化配置
-     * 
-     * @access public
-     * @param Typecho_Widget_Helper_Form $form
-     * @return void
-     */
-    public static function personalConfig(Typecho_Widget_Helper_Form $form){}
-    
-    /**
-     * 解析内容里的短代码
-     * 该方法用于解析文章内容中的短代码，将其替换为HTML音乐播放器
-     * 
-     * @access public
-     * @param string $content 文章内容
-     * @param Widget_Abstract_Contents $widget 文章组件
-     * @param string $lastResult 上一个插件处理的结果
+     * @param string $content
+     * @param Widget_Abstract_Contents $widget
+     * @param string $lastResult
      * @return string
      */
     public static function parse($content, $widget, $lastResult)
     {
-        // 如果有上一个插件处理结果，则使用该结果作为内容，否则使用原内容
         $content = empty($lastResult) ? $content : $lastResult;
-        
-        // 如果是文章页面且为单篇文章，则进行短代码替换
-        if ($widget instanceof Widget_Archive && $widget->is('single')) {
-            // 正则表达式匹配短代码，并替换为HTML代码块
-            $pattern = '/\[CustomMusicPlayer\s+audio="([^"]*?)"\s+cover="([^"]*?)"\s+title="([^"]*?)"\s+artist="([^"]*?)"\]/i';
-            $replacement = '<div class="custom-music-player" id="customMusicPlayer">
-                                <div class="player-container">
-                                    <div class="cover-container">
-                                        <img src="$2" alt="$3" class="cover-image">
-                                    </div>
-                                    <div class="info-container">
-                                        <h3 class="song-title">$3</h3>
-                                        <p class="artist-name">$4</p>
-                                    </div>
-                                    <div class="control-container">
-                                        <button class="play-pause-btn" data-audio="$1" aria-label="播放/暂停">
-                                            <svg class="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                            <svg class="pause-icon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>';
-            
-            // 将短代码替换为实际HTML
-            $content = preg_replace($pattern, $replacement, $content);
-            
-            // 在内容末尾添加自动播放提示的HTML代码
-            $content .= '<div id="autoplayNotice" class="autoplay-notice">
-                            <div class="notice-content">
-                                <div class="notice-header">
-                                    <span>本页面封面歌曲可播放</span>
-                                    <button id="closeNotice" class="close-notice" aria-label="关闭提示">&times;</button>
-                                </div>
-                                <button id="playNoticeButton" class="play-notice-button">播放</button>
-                                <div class="countdown-bar"></div>
-                            </div>
-                         </div>';
+
+        if (!($widget instanceof Widget_Archive) || !$widget->is('single')) {
+            return $content;
         }
-        
+
+        if (strpos($content, '[music') === false && stripos($content, '[CustomMusicPlayer') === false) {
+            return $content;
+        }
+
+        self::$needsAssets = true;
+
+        $content = preg_replace_callback(
+            '/\[(music|CustomMusicPlayer)\s+([^\]]+)\]/i',
+            array('CustomMusicPlayer_Plugin', 'renderShortcode'),
+            $content
+        );
+
         return $content;
     }
-    
+
     /**
-     * 在头部输出所需的CSS
-     * 用于输出自定义音乐播放器的CSS样式
-     * 
-     * @access public
-     * @return void
+     * @param array<int, string> $matches
+     * @return string
      */
+    public static function renderShortcode($matches)
+    {
+        $attrs = self::parseAttributes($matches[2]);
+
+        $from = isset($attrs['from']) ? strtolower(trim($attrs['from'])) : 'custom';
+        if (isset($attrs['server']) && $from === 'custom') {
+            $from = strtolower(trim($attrs['server']));
+        }
+
+        $title = isset($attrs['title']) ? trim($attrs['title']) : '';
+        $artist = isset($attrs['artist']) ? trim($attrs['artist']) : '';
+        $src = '';
+        if (isset($attrs['src'])) {
+            $src = trim($attrs['src']);
+        } elseif (isset($attrs['audio'])) {
+            $src = trim($attrs['audio']);
+        }
+        $cover = isset($attrs['cover']) ? trim($attrs['cover']) : '';
+        $mode = isset($attrs['mode']) ? strtolower(trim($attrs['mode'])) : 'click';
+        $notice = isset($attrs['notice']) ? strtolower(trim($attrs['notice'])) : '0';
+        $platformId = isset($attrs['id']) ? trim($attrs['id']) : '';
+        $hintOverride = array_key_exists('hint', $attrs) ? trim($attrs['hint']) : null;
+
+        if (!in_array($mode, array('click', 'scroll'), true)) {
+            $mode = 'click';
+        }
+
+        $noticeOn = in_array($notice, array('1', 'true', 'yes', 'on'), true);
+
+        if (in_array($from, array('netease', 'tencent'), true)) {
+            if ($platformId === '') {
+                return '<p class="music-player-error" role="alert">音乐播放器缺少平台歌曲 ID。</p>';
+            }
+            $resolved = self::resolvePlatformTrack($from, $platformId);
+            if ($resolved === null) {
+                return '<p class="music-player-error" role="alert">无法解析该曲目（' . htmlspecialchars($from, ENT_QUOTES, 'UTF-8') . ' / ' . htmlspecialchars($platformId, ENT_QUOTES, 'UTF-8') . '），请检查 ID 或插件里的 Meting API。</p>';
+            }
+            if ($title === '') {
+                $title = $resolved['title'];
+            }
+            if ($artist === '') {
+                $artist = $resolved['artist'];
+            }
+            if ($src === '') {
+                $src = $resolved['src'];
+            }
+            if ($cover === '') {
+                $cover = $resolved['cover'];
+            }
+        }
+
+        if ($title === '') {
+            $title = '未命名曲目';
+        }
+
+        if ($src === '') {
+            return '<p class="music-player-error" role="alert">音乐播放器缺少音频地址（src）。</p>';
+        }
+
+        $id = 'mp-' . substr(md5($src . $title . $from . $platformId . uniqid('', true)), 0, 10);
+
+        $titleEsc = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        $artistEsc = htmlspecialchars($artist, ENT_QUOTES, 'UTF-8');
+        $srcEsc = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
+        $coverEsc = htmlspecialchars($cover, ENT_QUOTES, 'UTF-8');
+        $modeEsc = htmlspecialchars($mode, ENT_QUOTES, 'UTF-8');
+        $noticeEsc = $noticeOn ? '1' : '0';
+
+        $coverHtml = $cover !== ''
+            ? '<img class="music-player-cover" src="' . $coverEsc . '" alt="' . $titleEsc . '" loading="lazy">'
+            : '<div class="music-player-cover music-player-cover--placeholder" aria-hidden="true"></div>';
+
+        $artistHtml = $artist !== ''
+            ? '<p class="music-player-artist">' . $artistEsc . '</p>'
+            : '';
+
+        $hintText = self::resolvePlayerHint($hintOverride);
+        $hintHtml = $hintText !== ''
+            ? '<p class="music-player-hint">' . htmlspecialchars($hintText, ENT_QUOTES, 'UTF-8') . '</p>'
+            : '';
+
+        $ringSvg = self::ringSvg('music-player-ring');
+
+        return '
+<figure class="music-player" id="' . $id . '" data-mp-id="' . $id . '" data-src="' . $srcEsc . '" data-mode="' . $modeEsc . '" data-title="' . $titleEsc . '" data-cover="' . $coverEsc . '" data-notice="' . $noticeEsc . '">
+    <div class="music-player-body">
+        <div class="music-player-vinyl-wrap">
+            <button type="button" class="music-player-disc-btn" aria-label="播放 ' . $titleEsc . '">
+                ' . $ringSvg . '
+                <div class="music-player-disc" aria-hidden="true">
+                    ' . $coverHtml . '
+                    <span class="music-player-disc-hole"></span>
+                </div>
+                <span class="music-player-center-ctrl" aria-hidden="true">
+                    <svg class="music-player-icon music-player-icon--play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg class="music-player-icon music-player-icon--pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </span>
+            </button>
+        </div>
+        <figcaption class="music-player-meta">
+            <p class="music-player-title">' . $titleEsc . '</p>
+            ' . $artistHtml . '
+            ' . $hintHtml . '
+        </figcaption>
+    </div>
+    <div class="music-player-sentinel" aria-hidden="true"></div>
+</figure>';
+    }
+
+    /**
+     * @param string|null $override 短代码 hint；null 表示未传，用插件默认
+     * @return string
+     */
+    private static function resolvePlayerHint($override)
+    {
+        if ($override !== null) {
+            return $override;
+        }
+
+        $default = '点按唱片播放 · 拖动外环调节进度';
+        try {
+            $plugin = Helper::options()->plugin('CustomMusicPlayer');
+            if (isset($plugin->playerHint)) {
+                return trim((string) $plugin->playerHint);
+            }
+        } catch (Exception $e) {
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param string $server netease|tencent
+     * @param string $id
+     * @return array{title:string,artist:string,src:string,cover:string}|null
+     */
+    private static function resolvePlatformTrack($server, $id)
+    {
+        $id = preg_replace('/\D+/', '', $id);
+        if ($id === '') {
+            return null;
+        }
+
+        $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
+        try {
+            $plugin = Helper::options()->plugin('CustomMusicPlayer');
+            if (!empty($plugin->metingApi)) {
+                $apiTpl = trim($plugin->metingApi);
+            }
+        } catch (Exception $e) {
+            // use default
+        }
+
+        $url = str_replace(
+            array(':server', ':type', ':id'),
+            array(rawurlencode($server), 'song', rawurlencode($id)),
+            $apiTpl
+        );
+
+        $json = self::httpGet($url);
+        if ($json === null || $json === '') {
+            return null;
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            return null;
+        }
+
+        // Meting may return object or array of objects
+        if (isset($data[0]) && is_array($data[0])) {
+            $data = $data[0];
+        }
+
+        $title = '';
+        if (isset($data['title'])) {
+            $title = (string) $data['title'];
+        } elseif (isset($data['name'])) {
+            $title = (string) $data['name'];
+        }
+
+        $artist = '';
+        if (isset($data['author'])) {
+            $artist = is_array($data['author']) ? implode(' / ', $data['author']) : (string) $data['author'];
+        } elseif (isset($data['artist'])) {
+            $artist = is_array($data['artist']) ? implode(' / ', $data['artist']) : (string) $data['artist'];
+        }
+
+        $src = isset($data['url']) ? (string) $data['url'] : '';
+        $cover = '';
+        if (isset($data['pic'])) {
+            $cover = (string) $data['pic'];
+        } elseif (isset($data['cover'])) {
+            $cover = (string) $data['cover'];
+        }
+
+        if ($src === '') {
+            return null;
+        }
+
+        return array(
+            'title' => $title !== '' ? $title : '未命名曲目',
+            'artist' => $artist,
+            'src' => $src,
+            'cover' => $cover
+        );
+    }
+
+    /**
+     * @param string $url
+     * @return string|null
+     */
+    private static function httpGet($url)
+    {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, array(
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_USERAGENT => 'CustomMusicPlayer/2.2 Typecho'
+            ));
+            $body = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($body === false || $code >= 400) {
+                return null;
+            }
+            return $body;
+        }
+
+        $ctx = stream_context_create(array(
+            'http' => array(
+                'timeout' => 10,
+                'header' => "User-Agent: CustomMusicPlayer/2.2 Typecho\r\n"
+            )
+        ));
+        $body = @file_get_contents($url, false, $ctx);
+        return $body === false ? null : $body;
+    }
+
+    /**
+     * @param string $className
+     * @return string
+     */
+    private static function ringSvg($className)
+    {
+        return '<svg class="' . $className . '" viewBox="0 0 100 100" aria-hidden="true">'
+            . '<circle class="' . $className . '-track" cx="50" cy="50" r="46" fill="none"></circle>'
+            . '<circle class="' . $className . '-progress" cx="50" cy="50" r="46" fill="none"></circle>'
+            . '</svg>';
+    }
+
+    /**
+     * @param string $text
+     * @return array<string, string>
+     */
+    private static function parseAttributes($text)
+    {
+        $attrs = array();
+        if (preg_match_all('/(\w+)\s*=\s*(["\'])(.*?)\2/is', $text, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $attrs[strtolower($match[1])] = $match[3];
+            }
+        }
+        return $attrs;
+    }
+
+    private static function shouldLoadAssets()
+    {
+        if (self::$needsAssets) {
+            return true;
+        }
+
+        try {
+            $archive = Typecho_Widget::widget('Widget_Archive');
+            if (!$archive->is('single')) {
+                return false;
+            }
+            // header 早于 contentEx：用正文原文判断是否含短代码，避免全站单页强挂资源
+            $raw = isset($archive->text) ? (string) $archive->text : '';
+            if ($raw !== '' && (strpos($raw, '[music') !== false || stripos($raw, '[CustomMusicPlayer') !== false)) {
+                self::$needsAssets = true;
+                return true;
+            }
+        } catch (Exception $e) {
+        }
+
+        return false;
+    }
+
     public static function header()
     {
-        echo self::getStyles(); // 输出CSS样式
+        if (!self::shouldLoadAssets()) {
+            return;
+        }
+
+        $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.css';
+        echo '<link rel="stylesheet" href="' . htmlspecialchars($base . '?ver=2.2.4', ENT_QUOTES, 'UTF-8') . '">';
     }
 
-    /**
-     * 在底部输出所需的JavaScript
-     * 用于输出自定义音乐播放器的JavaScript脚本
-     * 
-     * @access public
-     * @return void
-     */
     public static function footer()
     {
-        echo self::getScripts(); // 输出JavaScript脚本
+        if (!self::shouldLoadAssets()) {
+            return;
+        }
+
+        $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.js';
+        echo '<script src="' . htmlspecialchars($base . '?ver=2.2.4', ENT_QUOTES, 'UTF-8') . '" defer></script>';
     }
-    
-    /**
-     * 获取样式
-     * 该方法返回用于播放器样式的CSS代码
-     * 
-     * @return string
-     */
-    private static function getStyles()
+
+    public static function adminOption()
     {
-        return '<style>
-            .custom-music-player {
-                width: 100%;
-                max-width: 400px;
-                margin: 20px auto;
-                padding: 20px;
-                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
-                border-radius: 15px; /* 圆角边框 */
-                background: #fff; /* 背景颜色为白色 */
-                transition: all 0.3s ease; /* 过渡效果 */
-            }
-            .custom-music-player:hover {
-                transform: translateY(-5px); /* 鼠标悬停时上移效果 */
-                box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15); /* 增强阴影效果 */
-            }
-            .player-container {
-                display: flex;
-                align-items: center; /* 水平居中对齐 */
-            }
-            .cover-container {
-                width: 100px;
-                height: 100px;
-                margin-right: 20px; /* 右边距 */
-                border-radius: 10px; /* 圆角边框 */
-                overflow: hidden; /* 隐藏超出部分 */
-                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 图片阴影效果 */
-            }
-            .cover-image {
-                width: 100%;
-                height: 100%;
-                object-fit: cover; /* 保持图像比例填充容器 */
-                transition: transform 0.3s ease; /* 过渡效果 */
-            }
-            .cover-image:hover {
-                transform: scale(1.05); /* 鼠标悬停时放大效果 */
-            }
-            .info-container {
-                flex-grow: 1; /* 填充剩余空间 */
-            }
-            .song-title {
-                margin: 0;
-                font-size: 20px; /* 歌曲标题字体大小 */
-                font-weight: bold; /* 字体加粗 */
-                color: #333; /* 字体颜色 */
-            }
-            .artist-name {
-                margin: 5px 0 0;
-                font-size: 16px; /* 艺术家名字字体大小 */
-                color: #666; /* 字体颜色 */
-            }
-            .control-container {
-                margin-left: 20px; /* 左边距 */
-            }
-            .play-pause-btn {
-                width: 60px;
-                height: 60px;
-                border-radius: 50%; /* 圆形按钮 */
-                background: #f0f0f0; /* 背景颜色 */
-                border: none; /* 无边框 */
-                cursor: pointer; /* 鼠标指针样式 */
-                transition: all 0.3s ease; /* 过渡效果 */
-                display: flex;
-                align-items: center; /* 水平居中对齐 */
-                justify-content: center; /* 垂直居中对齐 */
-                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 按钮阴影效果 */
-            }
-            .play-pause-btn:hover {
-                background: #e6e6e6; /* 鼠标悬停时改变背景颜色 */
-                transform: scale(1.05); /* 鼠标悬停时放大效果 */
-            }
-            .play-pause-btn:active {
-                transform: scale(0.95); /* 点击时缩小效果 */
-            }
-            .play-pause-btn svg {
-                width: 30px;
-                height: 30px;
-                fill: #333; /* 图标填充颜色 */
-                transition: opacity 0.3s ease; /* 透明度过渡效果 */
-            }
-            .pause-icon {
-                display: none; /* 默认隐藏暂停图标 */
-            }
-            .playing .play-icon {
-                display: none; /* 播放状态时隐藏播放图标 */
-            }
-            .playing .pause-icon {
-                display: block; /* 播放状态时显示暂停图标 */
-            }
-            @keyframes rotate {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-            .autoplay-notice {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: #fff;
-                color: #333;
-                padding: 20px;
-                border-radius: 15px;
-                font-size: 14px;
-                z-index: 1000; /* 确保提示框位于最前方 */
-                width: 300px;
-                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); /* 提示框阴影效果 */
-                opacity: 0; /* 默认透明 */
-                transform: translateY(20px); /* 默认下移20px */
-                transition: all 0.5s ease; /* 过渡效果 */
-            }
-            .autoplay-notice.show {
-                opacity: 1; /* 显示时设置透明度为1 */
-                transform: translateY(0); /* 复位到原始位置 */
-            }
-            .notice-content {
-                display: flex;
-                flex-direction: column; /* 垂直布局 */
-            }
-            .notice-header {
-                display: flex;
-                justify-content: space-between; /* 水平两端对齐 */
-                align-items: center; /* 垂直居中对齐 */
-                margin-bottom: 15px;
-            }
-            .close-notice {
-                background: transparent;
-                border: none; /* 无边框 */
-                color: #333; /* 文字颜色 */
-                font-size: 20px;
-                cursor: pointer; /* 鼠标指针样式 */
-                transition: color 0.3s ease; /* 过渡效果 */
-            }
-            .close-notice:hover {
-                color: #ff5722; /* 鼠标悬停时改变颜色 */
-            }
-            .play-notice-button {
-                background-color: #ff5722; /* 按钮背景颜色 */
-                color: white; /* 按钮文字颜色 */
-                border: none; /* 无边框 */
-                padding: 12px 20px; /* 按钮内边距 */
-                border-radius: 8px; /* 圆角 */
-                cursor: pointer; /* 鼠标指针样式 */
-                transition: all 0.3s ease; /* 过渡效果 */
-                font-size: 16px; /* 字体大小 */
-                font-weight: bold; /* 字体加粗 */
-            }
-            .play-notice-button:hover {
-                background-color: #e64a19; /* 鼠标悬停时改变背景颜色 */
-                transform: translateY(-2px); /* 鼠标悬停时上移效果 */
-                box-shadow: 0 4px 10px rgba(230, 74, 25, 0.3); /* 按钮阴影效果 */
-            }
-            .countdown-bar {
-                height: 4px;
-                background-color: #ff5722; /* 进度条颜色 */
-                margin-top: 15px;
-                width: 100%; /* 宽度占满 */
-                border-radius: 2px; /* 圆角 */
-                transition: width 1s linear; /* 宽度过渡效果 */
-            }
-            @keyframes countdownAnimation {
-                0% { width: 100%; }
-                100% { width: 0%; }
-            }
-            .countdown-bar {
-                animation: countdownAnimation 5s linear; /* 倒计时动画效果 */
-            }
-            @media (max-width: 480px) {
-                .custom-music-player {
-                    padding: 15px;
-                }
-                .cover-container {
-                    width: 80px;
-                    height: 80px;
-                }
-                .song-title {
-                    font-size: 18px;
-                }
-                .artist-name {
-                    font-size: 14px;
-                }
-                .play-pause-btn {
-                    width: 50px;
-                    height: 50px;
-                }
-                .play-pause-btn svg {
-                    width: 25px;
-                    height: 25px;
-                }
-            }
-        </style>';
+        echo '<section class="typecho-post-option custom-music-player-admin-option">'
+            . '<label class="typecho-label">音乐播放器</label>'
+            . '<p><button type="button" class="btn btn-xs" id="cmp-open-inserter">插入音乐播放器</button></p>'
+            . '<p class="description">支持自定义 URL / 附件，或网易云歌曲 ID。</p>'
+            . '</section>';
     }
-    
-    /**
-     * 获取脚本
-     * 该方法返回用于播放器功能的JavaScript代码
-     * 
-     * @return string
-     */
-    private static function getScripts()
+
+    public static function adminBottom()
     {
-        return '<script>
-            (function() {
-                let countdownInterval = null;
+        $pluginUrl = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets';
+        $css = htmlspecialchars($pluginUrl . '/admin-inserter.css?ver=2.2.2', ENT_QUOTES, 'UTF-8');
+        $js = htmlspecialchars($pluginUrl . '/admin-inserter.js?ver=2.2.2', ENT_QUOTES, 'UTF-8');
 
-                // 初始化音乐播放器
-                function initializePlayers() {
-                    const players = document.querySelectorAll(".custom-music-player");
-                    players.forEach(player => {
-                        if (player.dataset.initialized) return; // 防止重复初始化
-                        
-                        const audioUrl = player.querySelector(".play-pause-btn").dataset.audio; // 获取音频URL
-                        const playPauseBtn = player.querySelector(".play-pause-btn"); // 获取播放按钮
-                        const coverImage = player.querySelector(".cover-image"); // 获取封面图片
+        $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
+        try {
+            $plugin = Helper::options()->plugin('CustomMusicPlayer');
+            if (!empty($plugin->metingApi)) {
+                $apiTpl = trim($plugin->metingApi);
+            }
+        } catch (Exception $e) {
+        }
+        echo '<link rel="stylesheet" href="' . $css . '">';
+        echo '<script>window.CMP_METING_API=' . json_encode($apiTpl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';</script>';
+        echo <<<'HTML'
+<div id="cmp-inserter-modal" class="cmp-modal" hidden>
+  <div class="cmp-modal-backdrop" data-cmp-close></div>
+  <div class="cmp-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cmp-modal-title">
+    <div class="cmp-modal-header">
+      <h3 id="cmp-modal-title">插入音乐播放器</h3>
+      <button type="button" class="cmp-modal-close" data-cmp-close aria-label="关闭">&times;</button>
+    </div>
+    <div class="cmp-modal-body">
+      <p>
+        <label for="cmp-source">插入方式</label>
+        <select id="cmp-source" class="w-100">
+          <option value="custom">自定义（URL / 附件）</option>
+          <option value="netease">网易云音乐（歌曲 ID）</option>
+          <option value="tencent">QQ 音乐（歌曲 ID）</option>
+        </select>
+      </p>
 
-                        let playerAudio = new Audio(audioUrl); // 创建Audio对象
-                        playerAudio.load(); // 预加载音频
+      <div id="cmp-panel-platform" class="cmp-panel" hidden>
+        <p>
+          <label for="cmp-platform-id">歌曲 ID 或分享链接 <span class="cmp-req">*</span></label>
+          <input type="text" id="cmp-platform-id" class="text w-100 mono" placeholder="如 185809 或 https://music.163.com/#/song?id=185809">
+        </p>
+        <p>
+          <button type="button" class="btn btn-xs" id="cmp-resolve-btn">解析曲目信息</button>
+          <span id="cmp-resolve-status" class="description" style="margin-left:8px"></span>
+        </p>
+      </div>
 
-                        // 点击播放/暂停按钮时，切换播放状态
-                        playPauseBtn.addEventListener("click", function() {
-                            togglePlay(playerAudio, playPauseBtn, coverImage);
-                        });
+      <p>
+        <label for="cmp-title">歌曲名 <span class="cmp-req cmp-req-title">*</span></label>
+        <input type="text" id="cmp-title" class="text w-100" placeholder="歌曲名">
+      </p>
+      <p>
+        <label for="cmp-artist">艺术家</label>
+        <input type="text" id="cmp-artist" class="text w-100" placeholder="可选">
+      </p>
 
-                        player.dataset.initialized = "true"; // 标记播放器已经初始化
-                    });
-                }
+      <div id="cmp-panel-custom" class="cmp-panel">
+        <p>
+          <label for="cmp-src">音频 URL（MP3） <span class="cmp-req">*</span></label>
+          <input type="text" id="cmp-src" class="text w-100 mono" placeholder="https://... 或从附件选择">
+          <select id="cmp-src-pick" class="w-100"><option value="">— 从已上传附件选择音频 —</option></select>
+        </p>
+        <p>
+          <label for="cmp-cover">封面 URL</label>
+          <input type="text" id="cmp-cover" class="text w-100 mono" placeholder="可选，图片 URL">
+          <select id="cmp-cover-pick" class="w-100"><option value="">— 从已上传附件选择封面 —</option></select>
+        </p>
+      </div>
 
-                // 切换播放/暂停状态
-                function togglePlay(playerAudio, playPauseBtn, coverImage) {
-                    if (playerAudio.paused) {
-                        playerAudio.play().then(() => {
-                            playPauseBtn.classList.add("playing"); // 播放时添加playing类，切换图标
-                            coverImage.style.animation = "rotate 10s linear infinite"; // 播放时封面旋转动画
-                        }).catch(e => {
-                            console.error("Error playing audio:", e); // 如果播放失败，输出错误信息
-                            alert("无法播放音频，请检查音频文件是否有效。"); // 弹出提示框，提示播放失败
-                        });
-                    } else {
-                        playerAudio.pause(); // 如果正在播放，则暂停音频
-                        playPauseBtn.classList.remove("playing"); // 移除playing类，切换回播放图标
-                        coverImage.style.animation = "none"; // 暂停时取消封面旋转动画
-                    }
-                }
-
-                // 初始化播放提示功能
-                function initializeNotice() {
-                    const autoplayNotice = document.getElementById("autoplayNotice"); // 获取自动播放提示元素
-                    if (!autoplayNotice || autoplayNotice.dataset.initialized) return; // 如果已经初始化，直接返回
-
-                    const playNoticeButton = document.getElementById("playNoticeButton"); // 获取播放提示按钮
-                    const closeNoticeButton = document.getElementById("closeNotice"); // 获取关闭提示按钮
-                    const countdownElement = autoplayNotice.querySelector(".countdown-bar"); // 获取倒计时进度条
-                    if (!playNoticeButton || !closeNoticeButton || !countdownElement) return;
-
-                    let countdown = 5; // 设置倒计时初始值为5秒
-                    autoplayNotice.dataset.initialized = "true"; // 标记提示框已经初始化
-
-                    autoplayNotice.classList.add("show"); // 显示提示框
-
-                    // 点击播放按钮时，滚动到播放器位置并开始播放
-                    playNoticeButton.addEventListener("click", function(e) {
-                        e.preventDefault();
-                        scrollToPlayer(); // 滚动到播放器
-                        const playPauseBtn = document.querySelector(".play-pause-btn");
-                        if (playPauseBtn) {
-                            playPauseBtn.click(); // 模拟点击播放按钮
-                        }
-                    });
-
-                    // 点击关闭按钮时，清除提示框
-                    closeNoticeButton.addEventListener("click", function(e) {
-                        e.preventDefault();
-                        clearNotice();
-                    });
-
-                    // 每秒更新一次倒计时
-                    countdownInterval = setInterval(function() {
-                        countdown--;
-                        countdownElement.style.width = (countdown / 5 * 100) + "%"; // 更新进度条宽度
-                        if (countdown <= 0) {
-                            clearInterval(countdownInterval); // 清除倒计时计时器
-                            autoplayNotice.classList.remove("show"); // 隐藏提示框
-                        }
-                    }, 1000);
-                }
-
-                // 清除提示框
-                function clearNotice() {
-                    clearInterval(countdownInterval); // 清除倒计时计时器
-                    const autoplayNotice = document.getElementById("autoplayNotice");
-                    if (autoplayNotice) {
-                        autoplayNotice.classList.remove("show"); // 隐藏提示框
-                    }
-                }
-
-                // 滚动到播放器位置，以便用户查看
-                function scrollToPlayer() {
-                    const player = document.getElementById("customMusicPlayer"); // 获取播放器元素
-                    if (player) {
-                        player.scrollIntoView({ behavior: "smooth", block: "center" }); // 平滑滚动到播放器位置
-                    }
-                }
-
-                // 初始化现有播放器和提示
-                function initializeWhenReady() {
-                    if (document.readyState === "loading") {
-                        // 如果页面正在加载，等待DOMContentLoaded事件再初始化
-                        document.addEventListener("DOMContentLoaded", () => {
-                            initializePlayers();
-                            initializeNotice();
-                        });
-                    } else {
-                        // 如果页面已加载，直接初始化
-                        initializePlayers();
-                        initializeNotice();
-                    }
-                }
-
-                initializeWhenReady(); // 执行初始化
-
-                // 使用MutationObserver监听DOM变化，以便在动态添加播放器时重新初始化
-                const observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                        if (mutation.type === "childList") {
-                            initializePlayers(); // 重新初始化播放器
-                            initializeNotice(); // 重新初始化提示框
-                        }
-                    });
-                });
-
-                // 观察整个文档的子节点变化
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                });
-            })();
-        </script>';
+      <p>
+        <label for="cmp-mode">播放模式</label>
+        <select id="cmp-mode" class="w-100">
+          <option value="click">点击播放</option>
+          <option value="scroll">滚入视口自动播放</option>
+        </select>
+      </p>
+      <p class="cmp-check">
+        <label><input type="checkbox" id="cmp-notice" value="1" checked> 进页显示「含背景音频」提示窗</label>
+      </p>
+    </div>
+    <div class="cmp-modal-footer">
+      <button type="button" class="btn" data-cmp-close>取消</button>
+      <button type="button" class="btn primary" id="cmp-insert-btn">插入短代码</button>
+    </div>
+  </div>
+</div>
+HTML;
+        echo '<script src="' . $js . '"></script>';
     }
 }
-?>
