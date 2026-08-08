@@ -1,0 +1,92 @@
+/**
+ * Author notice / statement block — accent via inline CSS variables
+ */
+.ac-notice {
+    --ac-bg: var(--primary, #1095c1);
+    --ac-fg: #fff;
+    --ac-radius: 12px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 1.5rem 0;
+    padding: 1.15rem 1.35rem;
+    background: var(--ac-bg);
+    color: var(--ac-fg);
+    border-radius: var(--ac-radius);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    font-family: var(--font-family, 'Noto Serif SC', serif);
+    line-height: 1.65;
+}
+
+.ac-notice--flat {
+    box-shadow: none;
+}
+
+.ac-notice-title {
+    margin: 0 0 0.35em;
+    padding: 0;
+    font-size: 1.05em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+}
+
+.ac-notice-body {
+    font-size: 0.95em;
+}
+
+.ac-notice-body,
+.ac-notice-body p,
+.ac-notice-body li,
+.ac-notice-body a {
+    color: inherit;
+}
+
+/* Beat Pico / theme paragraph spacing inside the block */
+.ac-notice .ac-notice-body > :first-child {
+    margin-top: 0 !important;
+}
+
+.ac-notice .ac-notice-body p {
+    margin: 0 0 0.55em !important;
+}
+
+.ac-notice .ac-notice-body p:last-child {
+    margin-bottom: 0 !important;
+}
+
+.ac-notice .ac-notice-body p:empty {
+    display: none !important;
+    margin: 0 !important;
+}
+
+.ac-notice-body a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ac-notice-body a:hover {
+    opacity: 0.9;
+}
+
+.ac-notice-body ul,
+.ac-notice-body ol {
+    margin: 0.25em 0 0.55em 1.2em !important;
+    padding: 0;
+    color: inherit;
+}
+
+.ac-notice-body li {
+    margin: 0 0 0.2em;
+}
+
+.ac-notice-body li::marker {
+    color: inherit;
+}
+
+@media (max-width: 576px) {
+    .ac-notice {
+        padding: 1rem 1.1rem;
+        border-radius: calc(var(--ac-radius) * 0.85);
+    }
+}

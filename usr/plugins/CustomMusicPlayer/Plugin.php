@@ -3,7 +3,7 @@
  * 文章内嵌唱片式音乐播放器，支持环形进度、悬浮迷你条、进页提示、自定义/网易云插入
  *
  * @package CustomMusicPlayer
- * @version 2.2.4
+ * @version 2.2.5
  * @dependence 9.9.2-*
  */
 
@@ -384,7 +384,7 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         }
 
         $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.css';
-        echo '<link rel="stylesheet" href="' . htmlspecialchars($base . '?ver=2.2.4', ENT_QUOTES, 'UTF-8') . '">';
+        echo '<link rel="stylesheet" href="' . htmlspecialchars($base . '?ver=2.2.5', ENT_QUOTES, 'UTF-8') . '">';
     }
 
     public static function footer()
@@ -394,23 +394,40 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         }
 
         $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.js';
-        echo '<script src="' . htmlspecialchars($base . '?ver=2.2.4', ENT_QUOTES, 'UTF-8') . '" defer></script>';
+        echo '<script src="' . htmlspecialchars($base . '?ver=2.2.5', ENT_QUOTES, 'UTF-8') . '" defer></script>';
+    }
+
+    /**
+     * 若已启用 ArticleComponents，则由「组件插入」统一接管后台入口。
+     * @return bool
+     */
+    private static function adminHandledByComponents()
+    {
+        return Typecho_Plugin::exists('ArticleComponents');
     }
 
     public static function adminOption()
     {
+        if (self::adminHandledByComponents()) {
+            return;
+        }
+
         echo '<section class="typecho-post-option custom-music-player-admin-option">'
             . '<label class="typecho-label">音乐播放器</label>'
             . '<p><button type="button" class="btn btn-xs" id="cmp-open-inserter">插入音乐播放器</button></p>'
-            . '<p class="description">支持自定义 URL / 附件，或网易云歌曲 ID。</p>'
+            . '<p class="description">支持自定义 URL / 附件，或网易云歌曲 ID。推荐启用 ArticleComponents 使用统一「组件插入」。</p>'
             . '</section>';
     }
 
     public static function adminBottom()
     {
+        if (self::adminHandledByComponents()) {
+            return;
+        }
+
         $pluginUrl = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets';
-        $css = htmlspecialchars($pluginUrl . '/admin-inserter.css?ver=2.2.2', ENT_QUOTES, 'UTF-8');
-        $js = htmlspecialchars($pluginUrl . '/admin-inserter.js?ver=2.2.2', ENT_QUOTES, 'UTF-8');
+        $css = htmlspecialchars($pluginUrl . '/admin-inserter.css?ver=2.2.5', ENT_QUOTES, 'UTF-8');
+        $js = htmlspecialchars($pluginUrl . '/admin-inserter.js?ver=2.2.5', ENT_QUOTES, 'UTF-8');
 
         $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
         try {
