@@ -1,21 +1,21 @@
-/* ArticleComponents admin inserter */
-.ac-modal[hidden] {
+/* ComponentInserter admin shell */
+.ci-modal[hidden] {
     display: none !important;
 }
 
-.ac-modal {
+.ci-modal {
     position: fixed;
     inset: 0;
     z-index: 10050;
 }
 
-.ac-modal-backdrop {
+.ci-modal-backdrop {
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
 }
 
-.ac-modal-dialog {
+.ci-modal-dialog {
     position: relative;
     z-index: 1;
     width: min(960px, calc(100vw - 24px));
@@ -29,8 +29,16 @@
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
 }
 
-.ac-modal-header,
-.ac-modal-footer {
+.ci-modal.is-wide .ci-modal-dialog {
+    width: min(1120px, calc(100vw - 20px));
+}
+
+.ci-modal.is-wide .ci-preview-stage {
+    min-height: 280px;
+}
+
+.ci-modal-header,
+.ci-modal-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -40,18 +48,18 @@
     flex-shrink: 0;
 }
 
-.ac-modal-footer {
+.ci-modal-footer {
     border-bottom: none;
     border-top: 1px solid #e9e9e6;
     justify-content: flex-end;
 }
 
-.ac-modal-header h3 {
+.ci-modal-header h3 {
     margin: 0;
     font-size: 16px;
 }
 
-.ac-modal-close {
+.ci-modal-close {
     border: none;
     background: transparent;
     font-size: 22px;
@@ -60,17 +68,16 @@
     color: #666;
 }
 
-.ac-modal-body {
+.ci-modal-body {
     display: grid;
-    grid-template-columns: minmax(280px, 0.92fr) minmax(0, 1.08fr);
+    grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr);
     gap: 0;
     min-height: 0;
     flex: 1;
     overflow: hidden;
 }
 
-/* Left: component picker + preview as one unit */
-.ac-modal-aside {
+.ci-modal-aside {
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -79,12 +86,13 @@
     border-right: 1px solid #dde1e6;
 }
 
-.ac-comp-picker {
+.ci-comp-picker {
     padding: 16px 16px 12px;
     border-bottom: 1px dashed #cfd6de;
 }
 
-.ac-comp-picker-label {
+.ci-comp-picker-label,
+.ci-preview-label {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -93,137 +101,119 @@
     margin-bottom: 10px;
 }
 
-.ac-comp-switch {
+.ci-comp-list {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 8px;
 }
 
-.ac-comp-chip {
+.ci-comp-item {
     appearance: none;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    padding: 8px 14px;
+    width: 100%;
+    text-align: left;
+    border: 1px solid #d0d7e0;
+    border-radius: 8px;
+    padding: 10px 12px;
     font-size: 13px;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.3;
     cursor: pointer;
     color: #334155;
-    background: rgba(255, 255, 255, 0.72);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.ac-comp-chip:hover {
+.ci-comp-item:hover {
     background: #fff;
-    border-color: #cbd5e1;
+    border-color: #b8c4d0;
 }
 
-.ac-comp-chip.is-active {
+.ci-comp-item.is-active {
     color: #fff;
-    background: #0f766e;
-    border-color: #0f766e;
-    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.28);
+    background: var(--ci-primary, #4E7289);
+    border-color: var(--ci-primary, #4E7289);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ci-primary, #4E7289) 35%, transparent);
 }
 
-.ac-modal-preview-wrap {
+.ci-modal-preview-wrap {
     padding: 14px 16px 18px;
     flex: 1;
     min-height: 0;
 }
 
-.ac-preview-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #5b6b7c;
-    margin-bottom: 10px;
-}
-
-.ac-preview-stage {
+.ci-preview-stage {
     background: #fff;
     border: 1px solid #d7dde5;
     border-radius: 10px;
     padding: 14px;
-    min-height: 220px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    min-height: 200px;
 }
 
-.ac-preview-empty {
+.ci-preview-empty {
     margin: 0;
     color: #8896a6;
     font-size: 13px;
 }
 
-/* Right: ordinary form controls */
-.ac-modal-main {
+.ci-modal-main {
     padding: 14px 16px;
     overflow: auto;
     background: #fff;
 }
 
-.ac-modal-main p {
+.ci-modal-main p {
     margin: 0 0 12px;
 }
 
-.ac-modal-main label {
+.ci-modal-main label {
     display: block;
     margin-bottom: 4px;
     font-weight: bold;
 }
 
-.ac-modal-main select,
-.ac-modal-main textarea {
+.ci-modal-main select,
+.ci-modal-main textarea {
     margin-top: 4px;
 }
 
-.ac-modal-main select {
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background: #fff;
-    padding: 4px 6px;
-}
-
-.ac-modal-main textarea {
+.ci-modal-main textarea {
     resize: vertical;
-    min-height: 180px;
+    min-height: 160px;
     line-height: 1.5;
 }
 
-.ac-preset-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: -4px !important;
+.ci-panel[hidden],
+.cmp-panel[hidden] {
+    display: none !important;
 }
 
-.ac-req {
+.ci-req {
     color: #c62828;
 }
 
-.ac-check label,
-.ac-check-inline label {
+.ci-check label,
+.ci-check-inline label {
     font-weight: normal;
 }
 
-.ac-check-inline {
+.ci-check-inline {
     display: flex;
     align-items: flex-end;
     padding-bottom: 4px;
 }
 
-.ac-inline-fields {
+.ci-inline-fields {
     display: flex;
     flex-wrap: wrap;
     gap: 12px 18px;
 }
 
-.ac-inline-fields > span {
+.ci-inline-fields > span {
     flex: 1 1 160px;
 }
 
-.ac-inline-fields input[type="color"] {
+.ci-inline-fields input[type="color"] {
     width: 42px;
     height: 32px;
     padding: 0;
@@ -232,7 +222,7 @@
     cursor: pointer;
 }
 
-.ac-color-text {
+.ci-color-text {
     width: calc(100% - 50px) !important;
     max-width: 120px;
     display: inline-block;
@@ -240,13 +230,11 @@
     margin-left: 6px;
 }
 
-.ac-panel[hidden],
-.cmp-panel[hidden] {
-    display: none !important;
-}
-
-#cmp-resolve-status {
-    color: #666;
+.ci-preset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: -4px !important;
 }
 
 .mono {
@@ -254,12 +242,16 @@
     font-size: 12px;
 }
 
+#cmp-resolve-status {
+    color: #666;
+}
+
 @media (max-width: 780px) {
-    .ac-modal-body {
+    .ci-modal-body {
         grid-template-columns: 1fr;
     }
 
-    .ac-modal-aside {
+    .ci-modal-aside {
         border-right: none;
         border-bottom: 1px solid #dde1e6;
         max-height: 42vh;

@@ -3,7 +3,7 @@
  * 文章内嵌唱片式音乐播放器，支持环形进度、悬浮迷你条、进页提示、自定义/网易云插入
  *
  * @package CustomMusicPlayer
- * @version 2.2.5
+ * @version 2.3.1
  * @dependence 9.9.2-*
  */
 
@@ -24,6 +24,8 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         Typecho_Plugin::factory('admin/write-post.php')->bottom = array('CustomMusicPlayer_Plugin', 'adminBottom');
         Typecho_Plugin::factory('admin/write-page.php')->option = array('CustomMusicPlayer_Plugin', 'adminOption');
         Typecho_Plugin::factory('admin/write-page.php')->bottom = array('CustomMusicPlayer_Plugin', 'adminBottom');
+
+        Typecho_Plugin::factory('ComponentInserter')->collect = array('CustomMusicPlayer_Plugin', 'registerComponent');
     }
 
     public static function deactivate() {}
@@ -384,7 +386,7 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         }
 
         $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.css';
-        echo '<link rel="stylesheet" href="' . htmlspecialchars($base . '?ver=2.2.5', ENT_QUOTES, 'UTF-8') . '">';
+        echo '<link rel="stylesheet" href="' . htmlspecialchars($base . '?ver=2.3.0', ENT_QUOTES, 'UTF-8') . '">';
     }
 
     public static function footer()
@@ -394,16 +396,141 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         }
 
         $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.js';
-        echo '<script src="' . htmlspecialchars($base . '?ver=2.2.5', ENT_QUOTES, 'UTF-8') . '" defer></script>';
+        echo '<script src="' . htmlspecialchars($base . '?ver=2.3.0', ENT_QUOTES, 'UTF-8') . '" defer></script>';
     }
 
     /**
-     * 若已启用 ArticleComponents，则由「组件插入」统一接管后台入口。
+     * 加载主题内置组件插入注册表
+     * @return bool
+     */
+    private static function loadCiRegistry()
+    {
+        if (class_exists('ComponentInserter_Registry')) {
+            return true;
+        }
+        try {
+            $options = Helper::options();
+            $reg = $options->themeFile($options->theme, 'include/ComponentInserter/Registry.php');
+            if (is_file($reg)) {
+                require_once $reg;
+            }
+        } catch (Exception $e) {
+        }
+        return class_exists('ComponentInserter_Registry');
+    }
+
+    /**
+     * 向组件插入壳注册音乐组件
+     */
+    public static function registerComponent()
+    {
+        if (!self::loadCiRegistry()) {
+            return;
+        }
+
+        $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
+        $playerHint = '点按唱片播放 · 拖动外环调节进度';
+        try {
+            $plugin = Helper::options()->plugin('CustomMusicPlayer');
+            if (!empty($plugin->metingApi)) {
+                $apiTpl = trim($plugin->metingApi);
+            }
+            if (isset($plugin->playerHint)) {
+                $playerHint = trim((string) $plugin->playerHint);
+            }
+        } catch (Exception $e) {
+        }
+
+        $pluginUrl = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets';
+
+        $panelHtml = <<<'HTML'
+<p>
+  <label for="cmp-source">插入方式</label>
+  <select id="cmp-source" class="w-100">
+    <option value="custom">自定义（URL / 附件）</option>
+    <option value="netease">网易云音乐（歌曲 ID）</option>
+    <option value="tencent">QQ 音乐（歌曲 ID）</option>
+  </select>
+</p>
+<div id="cmp-panel-platform" class="cmp-panel" hidden>
+  <p>
+    <label for="cmp-platform-id">歌曲 ID 或分享链接 <span class="ci-req">*</span></label>
+    <input type="text" id="cmp-platform-id" class="text w-100 mono" placeholder="如 185809 或分享链接">
+  </p>
+  <p>
+    <button type="button" class="btn btn-xs" id="cmp-resolve-btn">解析曲目信息</button>
+    <span id="cmp-resolve-status" class="description" style="margin-left:8px"></span>
+  </p>
+</div>
+<p>
+  <label for="cmp-title">歌曲名 <span class="ci-req cmp-req-title">*</span></label>
+  <input type="text" id="cmp-title" class="text w-100" placeholder="歌曲名">
+</p>
+<p>
+  <label for="cmp-artist">艺术家</label>
+  <input type="text" id="cmp-artist" class="text w-100" placeholder="可选">
+</p>
+<div id="cmp-panel-custom" class="cmp-panel">
+  <p>
+    <label for="cmp-src">音频 URL（MP3） <span class="ci-req">*</span></label>
+    <input type="text" id="cmp-src" class="text w-100 mono" placeholder="https://... 或从附件选择">
+    <select id="cmp-src-pick" class="w-100"><option value="">— 从已上传附件选择音频 —</option></select>
+  </p>
+  <p>
+    <label for="cmp-cover">封面 URL</label>
+    <input type="text" id="cmp-cover" class="text w-100 mono" placeholder="可选">
+    <select id="cmp-cover-pick" class="w-100"><option value="">— 从已上传附件选择封面 —</option></select>
+  </p>
+</div>
+<p>
+  <label for="cmp-mode">播放模式</label>
+  <select id="cmp-mode" class="w-100">
+    <option value="click">点击播放</option>
+    <option value="scroll">滚入视口自动播放</option>
+  </select>
+</p>
+<p>
+  <label for="cmp-hint">备注文案</label>
+  <input type="text" id="cmp-hint" class="text w-100" placeholder="">
+  <span class="description">显示在曲名下方的灰色提示。留空则不写入短代码，前台自动使用插件默认备注文案。</span>
+</p>
+<p class="ci-check">
+  <label><input type="checkbox" id="cmp-notice" value="1" checked> 进页显示「含背景音频」提示窗</label>
+</p>
+HTML;
+
+        ComponentInserter_Registry::register(array(
+            'id' => 'music',
+            'label' => '音乐播放器',
+            'order' => 10,
+            'panelHtml' => $panelHtml,
+            'boot' => array(
+                'metingApi' => $apiTpl,
+                'defaultHint' => $playerHint,
+            ),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=2.3.0'),
+        ));
+    }
+
+    /**
+     * Daydream 主题内置「组件插入」时，隐藏本插件独立侧栏入口。
      * @return bool
      */
     private static function adminHandledByComponents()
     {
-        return Typecho_Plugin::exists('ArticleComponents');
+        if (class_exists('Daydream_ComponentInserter')) {
+            return true;
+        }
+        try {
+            $options = Helper::options();
+            $shell = $options->themeFile($options->theme, 'include/ComponentInserter/Shell.php');
+            if (is_file($shell)) {
+                return true;
+            }
+        } catch (Exception $e) {
+        }
+        return Typecho_Plugin::exists('ComponentInserter')
+            || Typecho_Plugin::exists('ArticleComponents');
     }
 
     public static function adminOption()
@@ -415,7 +542,7 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         echo '<section class="typecho-post-option custom-music-player-admin-option">'
             . '<label class="typecho-label">音乐播放器</label>'
             . '<p><button type="button" class="btn btn-xs" id="cmp-open-inserter">插入音乐播放器</button></p>'
-            . '<p class="description">支持自定义 URL / 附件，或网易云歌曲 ID。推荐启用 ArticleComponents 使用统一「组件插入」。</p>'
+            . '<p class="description">支持自定义 URL / 附件，或网易云歌曲 ID。Daydream 主题下请用侧栏「组件插入」。</p>'
             . '</section>';
     }
 
@@ -426,8 +553,8 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         }
 
         $pluginUrl = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets';
-        $css = htmlspecialchars($pluginUrl . '/admin-inserter.css?ver=2.2.5', ENT_QUOTES, 'UTF-8');
-        $js = htmlspecialchars($pluginUrl . '/admin-inserter.js?ver=2.2.5', ENT_QUOTES, 'UTF-8');
+        $css = htmlspecialchars($pluginUrl . '/admin-inserter.css?ver=2.3.0', ENT_QUOTES, 'UTF-8');
+        $js = htmlspecialchars($pluginUrl . '/admin-inserter.js?ver=2.3.0', ENT_QUOTES, 'UTF-8');
 
         $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
         try {

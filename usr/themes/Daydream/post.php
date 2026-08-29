@@ -1,4 +1,12 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
+<?php
+$fieldsArr = $this->fields->toArray();
+$articleTemplate = isset($fieldsArr['articleTemplate']) ? trim((string) $fieldsArr['articleTemplate']) : '';
+if ($articleTemplate === 'music-album') {
+    $this->need('post/music-album.php');
+    return;
+}
+?>
 <?php $this->need('header.php'); ?>
 
 <?php if ($this->fields->linkTo): ?>
