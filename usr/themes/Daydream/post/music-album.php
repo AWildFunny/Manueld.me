@@ -1,7 +1,14 @@
 <?php if (!defined('__TYPECHO_ROOT_DIR__')) exit; ?>
-<?php $this->need('header.php'); ?>
+<?php
+/**
+ * 音乐相册文章模板
+ * 启用：自定义字段 articleTemplate = music-album
+ * 用法见主题根目录 MUSIC-ALBUM.md
+ */
+$this->need('header.php');
+?>
 
-<link rel="stylesheet" href="<?php $this->options->themeUrl('/assets/css/music-album.css'); ?>">
+<link rel="stylesheet" href="<?php $this->options->themeUrl('/assets/css/music-album.css'); ?>?ver=2.3.5">
 
 <?php if ($this->fields->linkTo): ?>
     <script type="text/javascript">window.location.href = '<?php echo $this->fields->linkTo; ?>';</script>
@@ -15,7 +22,6 @@
     <?php endif; ?>
 
     <header class="music-album-header">
-        <p class="music-album-badge"><i class="czs-music-l"></i> 音乐相册</p>
         <h1><?php $this->title(); ?></h1>
         <div class="meta-info">
             <i class="czs-calendar"></i>
@@ -77,6 +83,6 @@
 
 <?php $this->need('comments.php'); ?>
 
-<script src="<?php $this->options->themeUrl('/assets/js/music-album.js'); ?>" defer></script>
+<script src="<?php $this->options->themeUrl('/assets/js/music-album.js'); ?>?ver=2.3.4" defer></script>
 
 <?php $this->need('footer.php'); ?>

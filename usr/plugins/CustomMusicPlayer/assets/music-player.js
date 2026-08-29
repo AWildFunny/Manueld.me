@@ -3,15 +3,9 @@
 
     var REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var SCROLL_PLAY_RATIO = 0.5;
-
-    function formatTime(seconds) {
-        if (!isFinite(seconds) || seconds < 0) {
-            return '0:00';
-        }
-        var mins = Math.floor(seconds / 60);
-        var secs = Math.floor(seconds % 60);
-        return mins + ':' + (secs < 10 ? '0' : '') + secs;
-    }
+    var RING_LEN = 2 * Math.PI * 46;
+    var NOTICE_MS = 5000;
+    var LONG_PRESS_MS = 600;
 
     function getVisibleRatio(el) {
         var rect = el.getBoundingClientRect();
@@ -25,6 +19,40 @@
         return visibleHeight / Math.max(rect.height, 1);
     }
 
+    function setRingProgress(progressEl, ratio) {
+        if (!progressEl) {
+            return;
+        }
+        var r = Math.max(0, Math.min(1, ratio || 0));
+        progressEl.style.strokeDasharray = String(RING_LEN);
+        progressEl.style.strokeDashoffset = String(RING_LEN * (1 - r));
+    }
+
+    function angleRatioFromEvent(wrapEl, event) {
+        var rect = wrapEl.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        var clientX = event.clientX;
+        var clientY = event.clientY;
+        if (event.touches && event.touches[0]) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        }
+        var dx = clientX - cx;
+        var dy = clientY - cy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var radius = Math.min(rect.width, rect.height) / 2;
+        // only seek when near the ring band
+        if (dist < radius * 0.62 || dist > radius * 1.08) {
+            return null;
+        }
+        var angle = Math.atan2(dy, dx); // -PI..PI, 0 at east
+        var deg = (angle * 180) / Math.PI;
+        // convert so 12 o'clock = 0, clockwise
+        var progressDeg = (deg + 90 + 360) % 360;
+        return progressDeg / 360;
+    }
+
     function MusicPlayerManager() {
         this.audio = new Audio();
         this.audio.preload = 'metadata';
@@ -35,6 +63,12 @@
         this.dock = null;
         this.dockDisc = null;
         this.dockCover = null;
+        this.dockProgress = null;
+
+        this.noticeEl = null;
+        this.noticeTimer = null;
+        this.noticeHoldTimer = null;
+        this.noticeDismissed = false;
 
         this.visibilityObserver = null;
         this.isSeeking = false;
@@ -91,18 +125,21 @@
             this.observeCurrentPlayer();
         }
         this.evaluateScrollPlayers();
+        this.maybeShowNotice();
     };
 
     MusicPlayerManager.prototype.teardown = function () {
         this.pauseAndReset();
         this.disconnectObservers();
         this.hideDock();
+        this.destroyNotice();
 
         this.players.forEach(function (state) {
             delete state.el.dataset.mpInit;
         });
         this.players.clear();
         this.currentPlayer = null;
+        this.noticeDismissed = false;
 
         if (this.dock && this.dock.parentNode) {
             this.dock.parentNode.removeChild(this.dock);
@@ -110,6 +147,7 @@
         this.dock = null;
         this.dockDisc = null;
         this.dockCover = null;
+        this.dockProgress = null;
         this.audioUnlocked = false;
     };
 
@@ -119,41 +157,104 @@
         }
 
         var id = el.dataset.mpId || el.id;
-        var toggle = el.querySelector('.music-player-toggle');
-        var seek = el.querySelector('.music-player-seek');
+        var toggle = el.querySelector('.music-player-disc-btn');
         var disc = el.querySelector('.music-player-disc');
+        var progress = el.querySelector('.music-player-ring-progress');
+        var wrap = el.querySelector('.music-player-vinyl-wrap');
 
-        if (!toggle || !seek || !disc) {
+        if (!toggle || !disc || !wrap) {
             return;
         }
 
         el.dataset.mpInit = '1';
+        setRingProgress(progress, 0);
 
         var state = {
             el: el,
             toggle: toggle,
-            seek: seek,
             disc: disc,
-            timeCurrent: el.querySelector('.music-player-time--current'),
-            timeTotal: el.querySelector('.music-player-time--total'),
+            wrap: wrap,
+            progress: progress,
             mode: el.dataset.mode || 'click',
-            userPaused: false
+            notice: el.dataset.notice === '1',
+            userPaused: false,
+            seekPointerId: null
         };
 
         this.players.set(id, state);
 
         toggle.addEventListener('click', this.handleToggleClick.bind(this, state));
-
-        seek.addEventListener('input', this.handleSeekInput.bind(this, state));
-        seek.addEventListener('change', this.handleSeekChange.bind(this, state));
-        seek.addEventListener('mousedown', this.handleSeekStart.bind(this));
-        seek.addEventListener('touchstart', this.handleSeekStart.bind(this), { passive: true });
-        seek.addEventListener('mouseup', this.handleSeekEnd.bind(this));
-        seek.addEventListener('touchend', this.handleSeekEnd.bind(this));
+        this.bindRingSeek(state);
 
         if (state.mode === 'scroll') {
             this.attachScrollObserver(state);
         }
+    };
+
+    MusicPlayerManager.prototype.bindRingSeek = function (state) {
+        var self = this;
+        var wrap = state.wrap;
+
+        var onMove = function (event) {
+            if (!self.isSeeking || self.currentPlayer !== state) {
+                return;
+            }
+            if (event.cancelable) {
+                event.preventDefault();
+            }
+            var ratio = angleRatioFromEvent(wrap, event);
+            if (ratio === null || !self.audio.duration) {
+                return;
+            }
+            self.audio.currentTime = ratio * self.audio.duration;
+            self.updateProgressUI(state, ratio);
+        };
+
+        var onUp = function () {
+            if (!self.isSeeking) {
+                return;
+            }
+            self.isSeeking = false;
+            wrap.classList.remove('is-seeking');
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onUp);
+        };
+
+        var onDown = function (event) {
+            var ratio = angleRatioFromEvent(wrap, event);
+            if (ratio === null) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            self.audioUnlocked = true;
+
+            if (self.currentPlayer !== state) {
+                state.userPaused = false;
+                self.play(state);
+            }
+
+            if (!self.audio.duration) {
+                return;
+            }
+
+            self.isSeeking = true;
+            wrap.classList.add('is-seeking');
+            self.audio.currentTime = ratio * self.audio.duration;
+            self.updateProgressUI(state, ratio);
+
+            document.addEventListener('pointermove', onMove, { passive: false });
+            document.addEventListener('pointerup', onUp);
+            document.addEventListener('pointercancel', onUp);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('touchend', onUp);
+        };
+
+        wrap.addEventListener('pointerdown', onDown);
+        wrap.addEventListener('touchstart', onDown, { passive: false });
     };
 
     MusicPlayerManager.prototype.attachScrollObserver = function (state) {
@@ -215,6 +316,29 @@
         dock.setAttribute('aria-label', '返回正在播放的音乐');
         dock.hidden = true;
 
+        var ring = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        ring.setAttribute('class', 'music-player-dock-ring');
+        ring.setAttribute('viewBox', '0 0 100 100');
+        ring.setAttribute('aria-hidden', 'true');
+
+        var track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        track.setAttribute('class', 'music-player-dock-ring-track');
+        track.setAttribute('cx', '50');
+        track.setAttribute('cy', '50');
+        track.setAttribute('r', '46');
+        track.setAttribute('fill', 'none');
+
+        var progress = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        progress.setAttribute('class', 'music-player-dock-ring-progress');
+        progress.setAttribute('cx', '50');
+        progress.setAttribute('cy', '50');
+        progress.setAttribute('r', '46');
+        progress.setAttribute('fill', 'none');
+        setRingProgress(progress, 0);
+
+        ring.appendChild(track);
+        ring.appendChild(progress);
+
         var disc = document.createElement('div');
         disc.className = 'music-player-dock-disc';
 
@@ -229,6 +353,7 @@
 
         disc.appendChild(cover);
         disc.appendChild(hole);
+        dock.appendChild(ring);
         dock.appendChild(disc);
         document.body.appendChild(dock);
 
@@ -237,9 +362,18 @@
         this.dock = dock;
         this.dockDisc = disc;
         this.dockCover = cover;
+        this.dockProgress = progress;
     };
 
-    MusicPlayerManager.prototype.handleToggleClick = function (state) {
+    MusicPlayerManager.prototype.handleToggleClick = function (state, event) {
+        // ignore synthetic clicks that follow a ring seek
+        if (this.isSeeking) {
+            return;
+        }
+        if (event && angleRatioFromEvent(state.wrap, event) !== null) {
+            return;
+        }
+
         this.audioUnlocked = true;
         if (this.currentPlayer === state && !this.audio.paused) {
             state.userPaused = true;
@@ -250,30 +384,11 @@
         this.play(state);
     };
 
-    MusicPlayerManager.prototype.handleSeekStart = function () {
-        this.isSeeking = true;
-    };
-
-    MusicPlayerManager.prototype.handleSeekEnd = function () {
-        this.isSeeking = false;
-    };
-
-    MusicPlayerManager.prototype.handleSeekInput = function (state, event) {
-        if (!this.audio.duration || this.currentPlayer !== state) {
-            return;
+    MusicPlayerManager.prototype.updateProgressUI = function (state, ratio) {
+        setRingProgress(state.progress, ratio);
+        if (this.currentPlayer === state) {
+            setRingProgress(this.dockProgress, ratio);
         }
-        var ratio = parseFloat(event.target.value) / 100;
-        if (state.timeCurrent) {
-            state.timeCurrent.textContent = formatTime(ratio * this.audio.duration);
-        }
-    };
-
-    MusicPlayerManager.prototype.handleSeekChange = function (state, event) {
-        if (!this.audio.duration || this.currentPlayer !== state) {
-            return;
-        }
-        var ratio = parseFloat(event.target.value) / 100;
-        this.audio.currentTime = ratio * this.audio.duration;
     };
 
     MusicPlayerManager.prototype.play = function (state, options) {
@@ -282,6 +397,7 @@
 
         if (this.currentPlayer && this.currentPlayer !== state) {
             this.setPlayerPlaying(this.currentPlayer, false);
+            setRingProgress(this.currentPlayer.progress, 0);
         }
 
         this.currentPlayer = state;
@@ -298,6 +414,7 @@
         this.observeCurrentPlayer();
         this.updateDockContent(state);
         state.el.classList.remove('is-autoplay-blocked');
+        state.el.classList.remove('is-load-error');
 
         this.audio.play().then(function () {
             self.audioUnlocked = true;
@@ -323,10 +440,26 @@
             return;
         }
         state.el.classList.toggle('is-playing', playing);
-        state.disc.classList.toggle('is-spinning', playing && !REDUCED_MOTION);
+
+        // Keep animation attached so pause preserves rotation angle
+        if (!REDUCED_MOTION) {
+            state.disc.classList.add('is-spinning');
+            state.disc.classList.toggle('is-paused', !playing);
+        } else {
+            state.disc.classList.remove('is-spinning', 'is-paused');
+        }
+
         if (this.dockDisc) {
-            var dockShouldSpin = playing && !REDUCED_MOTION && this.shouldShowDock();
-            this.dockDisc.classList.toggle('is-spinning', dockShouldSpin);
+            if (!REDUCED_MOTION && this.shouldShowDock()) {
+                this.dockDisc.classList.add('is-spinning');
+                this.dockDisc.classList.toggle('is-paused', !playing);
+            } else if (!playing) {
+                this.dockDisc.classList.add('is-paused');
+            }
+        }
+
+        if (state.toggle) {
+            state.toggle.setAttribute('aria-label', (playing ? '暂停 ' : '播放 ') + (state.el.dataset.title || ''));
         }
     };
 
@@ -337,13 +470,10 @@
         var state = this.currentPlayer;
         var duration = this.audio.duration;
         var current = this.audio.currentTime;
-
-        if (state.seek && duration) {
-            state.seek.value = String((current / duration) * 100);
+        if (!duration) {
+            return;
         }
-        if (state.timeCurrent) {
-            state.timeCurrent.textContent = formatTime(current);
-        }
+        this.updateProgressUI(state, current / duration);
     };
 
     MusicPlayerManager.prototype.onLoadedMetadata = function () {
@@ -351,19 +481,21 @@
             return;
         }
         var duration = this.audio.duration;
-        if (this.currentPlayer.timeTotal) {
-            this.currentPlayer.timeTotal.textContent = formatTime(duration);
-        }
-        if (this.currentPlayer.seek) {
-            this.currentPlayer.seek.max = '100';
-            this.currentPlayer.seek.value = '0';
-        }
+        var current = this.audio.currentTime || 0;
+        this.updateProgressUI(this.currentPlayer, duration ? current / duration : 0);
     };
 
     MusicPlayerManager.prototype.onEnded = function () {
         if (this.currentPlayer) {
             this.setPlayerPlaying(this.currentPlayer, false);
+            // Reset spin angle only when track ends
+            this.currentPlayer.disc.classList.remove('is-spinning', 'is-paused');
+            setRingProgress(this.currentPlayer.progress, 0);
         }
+        if (this.dockDisc) {
+            this.dockDisc.classList.remove('is-spinning', 'is-paused');
+        }
+        setRingProgress(this.dockProgress, 0);
         this.hideDock();
     };
 
@@ -504,10 +636,16 @@
             return;
         }
 
+        // avoid overlapping notice
+        if (this.noticeEl && this.noticeEl.classList.contains('is-visible')) {
+            return;
+        }
+
         this.dock.hidden = false;
         this.dock.classList.add('is-visible');
-        if (this.dockDisc && this.currentPlayer && !this.audio.paused) {
-            this.dockDisc.classList.toggle('is-spinning', !REDUCED_MOTION);
+        if (this.dockDisc && this.currentPlayer && !REDUCED_MOTION) {
+            this.dockDisc.classList.add('is-spinning');
+            this.dockDisc.classList.toggle('is-paused', this.audio.paused);
         }
     };
 
@@ -519,7 +657,7 @@
         this.dock.classList.remove('is-visible');
         this.dock.hidden = true;
         if (this.dockDisc) {
-            this.dockDisc.classList.remove('is-spinning');
+            this.dockDisc.classList.add('is-paused');
         }
     };
 
@@ -534,6 +672,165 @@
             block: 'center'
         });
         this.hideDock();
+    };
+
+    /* ---- Entry notice ---- */
+
+    MusicPlayerManager.prototype.findNoticePlayer = function () {
+        var found = null;
+        this.players.forEach(function (state) {
+            if (!found && state.notice) {
+                found = state;
+            }
+        });
+        return found;
+    };
+
+    MusicPlayerManager.prototype.maybeShowNotice = function () {
+        if (this.noticeDismissed) {
+            return;
+        }
+        var state = this.findNoticePlayer();
+        if (!state) {
+            return;
+        }
+        this.showNotice(state);
+    };
+
+    MusicPlayerManager.prototype.showNotice = function (state) {
+        var self = this;
+        this.destroyNotice(false);
+
+        var el = document.createElement('div');
+        el.className = 'music-player-notice';
+        el.setAttribute('role', 'status');
+
+        var title = state.el.dataset.title || '背景音频';
+        el.innerHTML =
+            '<div class="music-player-notice-header">' +
+            '<p class="music-player-notice-title">本页含BGM~请注意音量</p>' +
+            '<button type="button" class="music-player-notice-close" aria-label="关闭">&times;</button>' +
+            '</div>' +
+            '<p class="music-player-notice-desc">点击跳转播放 长按取消</p>' +
+            '<div class="music-player-notice-bar"><div class="music-player-notice-bar-inner"></div></div>';
+
+        document.body.appendChild(el);
+        this.noticeEl = el;
+        this.noticeTarget = state;
+
+        requestAnimationFrame(function () {
+            el.classList.add('is-visible');
+        });
+
+        var closeBtn = el.querySelector('.music-player-notice-close');
+        closeBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            self.dismissNotice();
+        });
+
+        var holdStart = null;
+        var holdFired = false;
+
+        var clearHold = function () {
+            if (self.noticeHoldTimer) {
+                clearTimeout(self.noticeHoldTimer);
+                self.noticeHoldTimer = null;
+            }
+            el.classList.remove('is-holding');
+            holdStart = null;
+        };
+
+        var startHold = function (e) {
+            if (e.target.closest('.music-player-notice-close')) {
+                return;
+            }
+            holdFired = false;
+            holdStart = Date.now();
+            el.classList.add('is-holding');
+            self.noticeHoldTimer = setTimeout(function () {
+                holdFired = true;
+                self.dismissNotice();
+            }, LONG_PRESS_MS);
+        };
+
+        var endHold = function (e) {
+            if (holdFired) {
+                clearHold();
+                return;
+            }
+            var held = holdStart ? Date.now() - holdStart : 0;
+            clearHold();
+            if (held >= LONG_PRESS_MS) {
+                return;
+            }
+            if (e.target.closest('.music-player-notice-close')) {
+                return;
+            }
+            self.activateNotice();
+        };
+
+        el.addEventListener('pointerdown', startHold);
+        el.addEventListener('pointerup', endHold);
+        el.addEventListener('pointerleave', clearHold);
+        el.addEventListener('pointercancel', clearHold);
+        el.addEventListener('touchstart', startHold, { passive: true });
+        el.addEventListener('touchend', endHold);
+        el.addEventListener('touchcancel', clearHold);
+
+        this.noticeTimer = setTimeout(function () {
+            self.dismissNotice(false);
+        }, NOTICE_MS);
+    };
+
+    MusicPlayerManager.prototype.activateNotice = function () {
+        var state = this.noticeTarget;
+        this.dismissNotice(false);
+        if (!state) {
+            return;
+        }
+        this.audioUnlocked = true;
+        state.userPaused = false;
+        state.el.scrollIntoView({
+            behavior: REDUCED_MOTION ? 'auto' : 'smooth',
+            block: 'center'
+        });
+        this.play(state);
+    };
+
+    MusicPlayerManager.prototype.dismissNotice = function (permanent) {
+        if (permanent !== false) {
+            this.noticeDismissed = true;
+        }
+        this.destroyNotice(true);
+    };
+
+    MusicPlayerManager.prototype.destroyNotice = function (animate) {
+        var self = this;
+        if (this.noticeTimer) {
+            clearTimeout(this.noticeTimer);
+            this.noticeTimer = null;
+        }
+        if (this.noticeHoldTimer) {
+            clearTimeout(this.noticeHoldTimer);
+            this.noticeHoldTimer = null;
+        }
+        var el = this.noticeEl;
+        this.noticeEl = null;
+        this.noticeTarget = null;
+        if (!el) {
+            return;
+        }
+        el.classList.remove('is-visible');
+        if (animate) {
+            setTimeout(function () {
+                if (el.parentNode) {
+                    el.parentNode.removeChild(el);
+                }
+            }, 280);
+        } else if (el.parentNode) {
+            el.parentNode.removeChild(el);
+        }
     };
 
     window.MusicPlayerManager = new MusicPlayerManager();

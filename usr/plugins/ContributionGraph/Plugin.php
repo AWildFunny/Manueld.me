@@ -4,7 +4,7 @@
  * 实现类似 GitHub 个人页面的贡献统计热力图
  * 
  * @package ContributionGraph
- * @version 1.0.0
+ * @version 1.2.0
  * @link http://your-website.com
  * @dependence 9.9.2-*
  */
@@ -47,6 +47,9 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         
         // 在页面底部输出JavaScript
         Typecho_Plugin::factory('Widget_Archive')->footer = array('ContributionGraph_Plugin', 'footer');
+
+        // 组件插入面板
+        Typecho_Plugin::factory('ComponentInserter')->collect = array('ContributionGraph_Plugin', 'registerComponent');
         
         return _t('贡献统计图表插件已激活');
     }
@@ -124,6 +127,19 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         );
         $form->addInput($defaultYear);
         
+        // 默认显示布局
+        $defaultLayout = new Typecho_Widget_Helper_Form_Element_Radio(
+            'defaultLayout',
+            array(
+                'year' => '全年顺序（1–12 月）',
+                'centered' => '以今日居中'
+            ),
+            'year',
+            _t('默认显示布局'),
+            _t('短代码未指定 layout 时使用。year=自然年 1–12 月；centered=约 53 周并以今天所在周居中。')
+        );
+        $form->addInput($defaultLayout);
+
         // 说明区域内容
         $description = new Typecho_Widget_Helper_Form_Element_Textarea(
             'description',
@@ -143,6 +159,84 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
      * @return void
      */
     public static function personalConfig(Typecho_Widget_Helper_Form $form){}
+
+    /**
+     * 加载主题内置组件插入注册表
+     * @return bool
+     */
+    private static function loadCiRegistry()
+    {
+        if (class_exists('ComponentInserter_Registry')) {
+            return true;
+        }
+        try {
+            $options = Helper::options();
+            $reg = $options->themeFile($options->theme, 'include/ComponentInserter/Registry.php');
+            if (is_file($reg)) {
+                require_once $reg;
+            }
+        } catch (Exception $e) {
+        }
+        return class_exists('ComponentInserter_Registry');
+    }
+
+    /**
+     * 向组件插入壳注册贡献图组件
+     */
+    public static function registerComponent()
+    {
+        if (!self::loadCiRegistry()) {
+            return;
+        }
+
+        $year = date('Y');
+        $layout = 'year';
+        try {
+            $plugin = Helper::options()->plugin('ContributionGraph');
+            if (!empty($plugin->defaultYear) && preg_match('/^\d{4}$/', trim($plugin->defaultYear))) {
+                $year = trim($plugin->defaultYear);
+            }
+            if (!empty($plugin->defaultLayout) && in_array($plugin->defaultLayout, array('year', 'centered'), true)) {
+                $layout = $plugin->defaultLayout;
+            }
+        } catch (Exception $e) {
+        }
+
+        $yearEsc = htmlspecialchars($year, ENT_QUOTES, 'UTF-8');
+        $yearChecked = $layout === 'year' ? ' checked' : '';
+        $centeredChecked = $layout === 'centered' ? ' checked' : '';
+        $panelHtml = <<<HTML
+<p>
+  <label>显示布局</label>
+  <span class="ci-check" style="display:block;margin-top:6px">
+    <label><input type="radio" name="cg-layout" id="cg-layout-year" value="year"{$yearChecked}> 全年顺序（1–12 月）</label>
+  </span>
+  <span class="ci-check" style="display:block;margin-top:4px">
+    <label><input type="radio" name="cg-layout" id="cg-layout-centered" value="centered"{$centeredChecked}> 以今日居中</label>
+  </span>
+  <span class="description">全年：固定自然年日历；居中：约 53 周，今天所在周在正中。</span>
+</p>
+<p id="cg-year-wrap">
+  <label for="cg-year">显示年份</label>
+  <input type="number" id="cg-year" class="text w-100" min="2000" max="2100" value="{$yearEsc}">
+  <span class="description">仅「全年顺序」时有效；留空则用插件默认年份。</span>
+</p>
+<p class="description">短代码示例：<code>[ContributionGraph layout="year"]</code>、<code>[ContributionGraph layout="centered"]</code></p>
+HTML;
+
+        $pluginUrl = Helper::options()->pluginUrl . '/ContributionGraph';
+        ComponentInserter_Registry::register(array(
+            'id' => 'contribution',
+            'label' => '贡献图',
+            'order' => 30,
+            'panelHtml' => $panelHtml,
+            'boot' => array(
+                'defaultYear' => $year,
+                'defaultLayout' => $layout,
+            ),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.2.0'),
+        ));
+    }
     
     /**
      * 创建数据库表
@@ -417,42 +511,117 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
     public static function parse($content, $widget, $lastResult)
     {
         $content = empty($lastResult) ? $content : $lastResult;
-        
-        // 匹配短代码 [ContributionGraph] 或 [ContributionGraph year="2025"]
-        $pattern = '/\[ContributionGraph(?:\s+year=["\']?(\d{4})["\']?)?\]/i';
-        
-        $content = preg_replace_callback($pattern, function($matches) {
-            $year = !empty($matches[1]) ? intval($matches[1]) : null;
-            return self::renderGraph($year);
+
+        // [ContributionGraph] / [ContributionGraph year="2025"] / [ContributionGraph layout="centered"]
+        // 兼容 Markdown 转义后的 &quot;
+        $pattern = '/\[ContributionGraph((?:\s+[a-zA-Z_][\w-]*\s*=\s*(?:"[^"]*"|\'[^\']*\'|&quot;.*?&quot;|[^\s\]]+))*)\s*\]/i';
+
+        $content = preg_replace_callback($pattern, function ($matches) {
+            $attrs = self::parseShortcodeAttrs(isset($matches[1]) ? $matches[1] : '');
+            $year = null;
+            if (!empty($attrs['year']) && preg_match('/^\d{4}$/', $attrs['year'])) {
+                $year = intval($attrs['year']);
+            }
+            $layout = null;
+            if (!empty($attrs['layout'])) {
+                $layout = strtolower(trim($attrs['layout']));
+            }
+            return self::renderGraph($year, $layout);
         }, $content);
-        
+
         return $content;
     }
-    
+
+    /**
+     * 解析短代码属性
+     * @param string $raw
+     * @return array<string,string>
+     */
+    private static function parseShortcodeAttrs($raw)
+    {
+        $attrs = array();
+        if ($raw === '' || $raw === null) {
+            return $attrs;
+        }
+        $raw = html_entity_decode($raw, ENT_QUOTES, 'UTF-8');
+        if (preg_match_all('/([a-zA-Z_][\w-]*)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s\]]+))/', $raw, $m, PREG_SET_ORDER)) {
+            foreach ($m as $match) {
+                $key = strtolower($match[1]);
+                $val = '';
+                if (isset($match[2]) && $match[2] !== '') {
+                    $val = $match[2];
+                } elseif (isset($match[3]) && $match[3] !== '') {
+                    $val = $match[3];
+                } elseif (isset($match[4])) {
+                    $val = $match[4];
+                }
+                $attrs[$key] = $val;
+            }
+        }
+        return $attrs;
+    }
+
     /**
      * 渲染贡献图表
-     * 
+     *
      * @access private
-     * @param int|null $year 年份，null表示使用默认年份
+     * @param int|null $year 年份，null 表示使用默认年份（仅 year 布局）
+     * @param string|null $layout year|centered
      * @return string HTML代码
      */
-    private static function renderGraph($year = null)
+    private static function renderGraph($year = null, $layout = null)
     {
         $options = Typecho_Widget::widget('Widget_Options');
         $pluginOptions = $options->plugin('ContributionGraph');
-        
+
+        if ($layout === null || ($layout !== 'year' && $layout !== 'centered')) {
+            $layout = !empty($pluginOptions->defaultLayout) ? $pluginOptions->defaultLayout : 'year';
+        }
+        if ($layout !== 'year' && $layout !== 'centered') {
+            $layout = 'year';
+        }
+
+        if ($layout === 'centered') {
+            $range = self::getCenteredRange();
+            $contributions = self::getContributionsRange($range['start'], $range['end']);
+            $graphId = 'contribution-graph-' . uniqid();
+            $title = '贡献统计（今日居中）';
+            $subtitle = htmlspecialchars($range['start'] . ' ~ ' . $range['end'], ENT_QUOTES, 'UTF-8');
+            $total = array_sum($contributions);
+
+            $html = '<div class="contribution-graph-container" id="' . htmlspecialchars($graphId) . '" data-layout="centered" data-start="' . htmlspecialchars($range['start'], ENT_QUOTES, 'UTF-8') . '" data-end="' . htmlspecialchars($range['end'], ENT_QUOTES, 'UTF-8') . '">';
+            $html .= '<div class="contribution-graph-header">';
+            $html .= '<h3 class="contribution-graph-title">' . $title . '</h3>';
+            $html .= '<div class="contribution-graph-total">共 ' . $total . ' 次贡献 · ' . $subtitle . '</div>';
+            $html .= '</div>';
+            $html .= '<div class="contribution-graph">';
+            $html .= self::generateHeatmapRange($contributions, $range);
+            $html .= '</div>';
+            $html .= '<div class="contribution-graph-footer">';
+            $html .= '<div class="contribution-graph-legend">';
+            $html .= '<span class="legend-label">少</span>';
+            $html .= '<div class="legend-squares">';
+            $html .= '<div class="legend-square" data-level="0"></div>';
+            $html .= '<div class="legend-square" data-level="1"></div>';
+            $html .= '<div class="legend-square" data-level="2"></div>';
+            $html .= '<div class="legend-square" data-level="3"></div>';
+            $html .= '</div>';
+            $html .= '<span class="legend-label">多</span>';
+            $html .= '</div>';
+            $html .= self::generateDescription($pluginOptions);
+            $html .= '</div>';
+            $html .= '</div>';
+            return $html;
+        }
+
         if ($year === null) {
             $year = !empty($pluginOptions->defaultYear) ? intval($pluginOptions->defaultYear) : date('Y');
         }
-        
-        // 获取该年份的贡献数据
+
         $contributions = self::getContributions($year);
-        
-        // 生成唯一ID
         $graphId = 'contribution-graph-' . uniqid();
-        
-        // 生成HTML
-        $html = '<div class="contribution-graph-container" id="' . htmlspecialchars($graphId) . '" data-year="' . $year . '">';
+
+        $html = '<div class="contribution-graph-container" id="' . htmlspecialchars($graphId) . '" data-year="' . $year . '" data-layout="year">';
         $html .= '<div class="contribution-graph-header">';
         $html .= '<h3 class="contribution-graph-title">' . $year . ' 年贡献统计</h3>';
         $html .= '<div class="contribution-graph-total">共 ' . array_sum($contributions) . ' 次贡献</div>';
@@ -471,13 +640,10 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         $html .= '</div>';
         $html .= '<span class="legend-label">多</span>';
         $html .= '</div>';
-        
-        // 添加说明区域（与图例同一行）
         $html .= self::generateDescription($pluginOptions);
-        
         $html .= '</div>';
         $html .= '</div>';
-        
+
         return $html;
     }
     
@@ -543,9 +709,53 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         
         return $contributions;
     }
+
+    /**
+     * 按日期区间取贡献
+     * @param string $startDate Y-m-d
+     * @param string $endDate Y-m-d
+     * @return array
+     */
+    private static function getContributionsRange($startDate, $endDate)
+    {
+        $db = Typecho_Db::get();
+        $rows = $db->fetchAll($db->select('date', 'count')
+            ->from('table.contributions')
+            ->where('date >= ?', $startDate)
+            ->where('date <= ?', $endDate));
+
+        $contributions = array();
+        foreach ($rows as $row) {
+            $contributions[$row['date']] = intval($row['count']);
+        }
+        return $contributions;
+    }
+
+    /**
+     * 计算「今日居中」的周对齐区间（默认 53 周，今日所在周在正中）
+     * @return array{start:string,end:string,totalWeeks:int,rangeStartTs:int,today:string}
+     */
+    private static function getCenteredRange()
+    {
+        $totalWeeks = 53;
+        $centerWeek = (int) floor($totalWeeks / 2); // 26
+        $todayTs = strtotime('today');
+        $todayDow = (int) date('w', $todayTs); // 0=Sun
+        $weekStartToday = strtotime('-' . $todayDow . ' days', $todayTs);
+        $rangeStartTs = strtotime('-' . $centerWeek . ' weeks', $weekStartToday);
+        $rangeEndTs = strtotime('+' . (($totalWeeks * 7) - 1) . ' days', $rangeStartTs);
+
+        return array(
+            'start' => date('Y-m-d', $rangeStartTs),
+            'end' => date('Y-m-d', $rangeEndTs),
+            'totalWeeks' => $totalWeeks,
+            'rangeStartTs' => $rangeStartTs,
+            'today' => date('Y-m-d', $todayTs),
+        );
+    }
     
     /**
-     * 生成热力图
+     * 生成热力图（自然年 1–12 月）
      * 
      * @access private
      * @param array $contributions 贡献数据
@@ -643,6 +853,73 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
         
         $html .= '</div>';
         
+        return $html;
+    }
+
+    /**
+     * 生成「今日居中」热力图
+     *
+     * @param array $contributions
+     * @param array $range getCenteredRange() 返回值
+     * @return string
+     */
+    private static function generateHeatmapRange($contributions, $range)
+    {
+        $squareSize = 11;
+        $squareMargin = 2;
+        $squareTotal = $squareSize + $squareMargin * 2;
+        $weekLabelWidth = 30;
+        $monthLabelHeight = 15;
+        $totalWeeks = (int) $range['totalWeeks'];
+        $rangeStartTs = (int) $range['rangeStartTs'];
+        $today = $range['today'];
+
+        $monthLabels = array();
+        $lastMonthKey = '';
+        for ($week = 0; $week < $totalWeeks; $week++) {
+            $ts = strtotime('+' . ($week * 7) . ' days', $rangeStartTs);
+            $monthKey = date('Y-n', $ts);
+            if ($monthKey !== $lastMonthKey) {
+                $monthLabels[$week] = intval(date('n', $ts)) . '月';
+                $lastMonthKey = $monthKey;
+            }
+        }
+
+        $width = $weekLabelWidth + $totalWeeks * $squareTotal;
+        $html = '<div class="contribution-graph-heatmap-wrapper" style="width:' . $width . 'px">';
+
+        foreach ($monthLabels as $week => $monthLabel) {
+            $left = $weekLabelWidth + $week * $squareTotal;
+            $html .= '<div class="month-label" style="left: ' . $left . 'px;">' . htmlspecialchars($monthLabel) . '</div>';
+        }
+
+        $weekLabelMap = array(1 => '周一', 3 => '周三', 5 => '周五');
+        foreach ($weekLabelMap as $day => $label) {
+            $top = $monthLabelHeight + $day * $squareTotal;
+            $html .= '<div class="week-label" style="top: ' . $top . 'px;">' . htmlspecialchars($label) . '</div>';
+        }
+
+        for ($week = 0; $week < $totalWeeks; $week++) {
+            for ($day = 0; $day < 7; $day++) {
+                $ts = strtotime('+' . ($week * 7 + $day) . ' days', $rangeStartTs);
+                $date = date('Y-m-d', $ts);
+                $left = $weekLabelWidth + $week * $squareTotal + $squareMargin;
+                $top = $monthLabelHeight + $day * $squareTotal + $squareMargin;
+                $count = isset($contributions[$date]) ? $contributions[$date] : 0;
+                $level = self::getContributionLevel($count);
+                $isToday = ($date === $today);
+                $extraClass = $isToday ? ' is-today' : '';
+
+                $html .= '<div class="contribution-day level-' . $level . $extraClass . '" ';
+                $html .= 'style="left: ' . $left . 'px; top: ' . $top . 'px;" ';
+                $html .= 'data-date="' . htmlspecialchars($date) . '" ';
+                $html .= 'data-count="' . $count . '" ';
+                $html .= 'title="' . htmlspecialchars($date . ': ' . $count . ' 次贡献' . ($isToday ? '（今天）' : '')) . '">';
+                $html .= '</div>';
+            }
+        }
+
+        $html .= '</div>';
         return $html;
     }
     
@@ -799,6 +1076,11 @@ class ContributionGraph_Plugin implements Typecho_Plugin_Interface
 
 .contribution-day:hover {
     outline: 1px solid rgba(0, 0, 0, 0.5);
+    outline-offset: -1px;
+}
+
+.contribution-day.is-today {
+    outline: 2px solid #4E7289;
     outline-offset: -1px;
 }
 

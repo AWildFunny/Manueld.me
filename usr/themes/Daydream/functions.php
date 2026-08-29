@@ -3,6 +3,17 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 
 define('__TYPECHO_GRAVATAR_PREFIX__', 'https://gravatar.loli.net/avatar/');
 
+/**
+ * Daydream 内置「组件插入」壳：写文章/页面侧栏默认开启，各业务插件通过
+ * Typecho_Plugin::factory('ComponentInserter')->collect 注册。
+ */
+require_once __DIR__ . '/include/ComponentInserter/Registry.php';
+require_once __DIR__ . '/include/ComponentInserter/Shell.php';
+Typecho_Plugin::factory('admin/write-post.php')->option = array('Daydream_ComponentInserter', 'adminOption');
+Typecho_Plugin::factory('admin/write-post.php')->bottom = array('Daydream_ComponentInserter', 'adminBottom');
+Typecho_Plugin::factory('admin/write-page.php')->option = array('Daydream_ComponentInserter', 'adminOption');
+Typecho_Plugin::factory('admin/write-page.php')->bottom = array('Daydream_ComponentInserter', 'adminBottom');
+
 function themeConfig($form) {
     echo '<h2>Sky 主题设置</h2>';
 
@@ -123,6 +134,131 @@ function exContent($content, $skipToc = false){
 }
 
 /**
+ * 将 album-shot 预设/自定义旋钮规范为 pos / titlepos / wrap
+ *
+ * @param string $layout
+ * @param array $attrs
+ * @return array{0:string,1:string,2:string,3:bool} [layout, pos, titlepos, wrap]
+ */
+function musicAlbumNormalizeShot($layout, $attrs) {
+    $layout = strtolower(trim((string) $layout));
+    $pos = isset($attrs['pos']) ? strtolower(trim((string) $attrs['pos'])) : '';
+    $titlepos = isset($attrs['titlepos']) ? strtolower(trim((string) $attrs['titlepos'])) : '';
+    if ($titlepos === '' && isset($attrs['heading'])) {
+        $titlepos = strtolower(trim((string) $attrs['heading']));
+    }
+    $wrapRaw = isset($attrs['wrap']) ? strtolower(trim((string) $attrs['wrap'])) : '';
+    $wrap = in_array($wrapRaw, array('1', 'true', 'yes', 'on'), true);
+
+    if ($layout === '' || $layout === 'auto') {
+        return array('auto', 'top', 'above', false);
+    }
+    if ($layout === 'banner') {
+        return array('banner', 'top', 'above', false);
+    }
+    if ($layout === 'overlay') {
+        return array('overlay', 'bg', 'on', false);
+    }
+    if ($layout === 'split-left' || $layout === 'splitleft') {
+        return array('split-left', 'left', 'beside', false);
+    }
+    if ($layout === 'split-right' || $layout === 'splitright') {
+        return array('split-right', 'right', 'beside', false);
+    }
+    if ($layout === 'float') {
+        $pos = ($pos === 'right') ? 'right' : 'left';
+        return array('float', $pos, 'above', true);
+    }
+
+    if (!in_array($pos, array('top', 'left', 'right', 'bg'), true)) {
+        $pos = 'top';
+    }
+    if (!in_array($titlepos, array('above', 'on', 'beside', 'below'), true)) {
+        $titlepos = 'above';
+    }
+    return array('custom', $pos, $titlepos, $wrap);
+}
+
+/**
+ * 从 figure 标签读取 data-* 属性
+ *
+ * @param string $figureHtml
+ * @return array<string,string>
+ */
+function musicAlbumReadShotAttrs($figureHtml) {
+    $attrs = array();
+    if (preg_match_all('/\bdata-([a-z]+)\s*=\s*"([^"]*)"/i', $figureHtml, $m, PREG_SET_ORDER)) {
+        foreach ($m as $item) {
+            $attrs[strtolower($item[1])] = html_entity_decode($item[2], ENT_QUOTES, 'UTF-8');
+        }
+    }
+    return $attrs;
+}
+
+/**
+ * 将章节内 album-shot 或首张图片提升为章头视觉，并包一层正文
+ *
+ * @param string $chapterHtml
+ * @return array{0:string,1:bool,2:string,3:string,4:string,5:bool} html, hasMedia, layout, pos, titlepos, wrap
+ */
+function musicAlbumEnhanceChapterMedia($chapterHtml) {
+    if (!preg_match('/^<h2\b[^>]*>.*?<\/h2>/is', $chapterHtml, $h2Match)) {
+        return array($chapterHtml, false, '', 'top', 'above', false);
+    }
+
+    $h2 = $h2Match[0];
+    $rest = substr($chapterHtml, strlen($h2));
+    $figure = '';
+    $layout = 'auto';
+    $attrs = array();
+
+        if (preg_match('/(?:<p>\s*)?(<div\b[^>]*\balbum-board\b[\s\S]*?<\/div>\s*<\/div>)(?:\s*<\/p>)?/is', $rest, $boardMatch, PREG_OFFSET_CAPTURE)) {
+            $figure = $boardMatch[1][0];
+            $full = $boardMatch[0][0];
+            $offset = $boardMatch[0][1];
+            $rest = substr($rest, 0, $offset) . substr($rest, $offset + strlen($full));
+            $assembled = $h2 . "\n" . $figure . '<div class="music-album-chapter-body">' . $rest . '</div>';
+            return array($assembled, true, 'board', 'top', 'above', false);
+        }
+
+        if (preg_match('/(?:<p>\s*)?(<figure\b[^>]*\balbum-shot\b[^>]*>.*?<\/figure>)(?:\s*<\/p>)?/is', $rest, $shotMatch, PREG_OFFSET_CAPTURE)) {
+        $figure = $shotMatch[1][0];
+        $full = $shotMatch[0][0];
+        $offset = $shotMatch[0][1];
+        $rest = substr($rest, 0, $offset) . substr($rest, $offset + strlen($full));
+        $attrs = musicAlbumReadShotAttrs($figure);
+        $layout = isset($attrs['layout']) ? $attrs['layout'] : 'auto';
+        if (stripos($figure, 'music-album-chapter-media') === false) {
+            if (preg_match('/<figure[^>]*\bclass="/i', $figure)) {
+                $figure = preg_replace('/(<figure[^>]*\bclass=")([^"]*)(")/i', '$1$2 music-album-chapter-media$3', $figure, 1);
+            } else {
+                $figure = preg_replace('/<figure\b/i', '<figure class="music-album-chapter-media"', $figure, 1);
+            }
+        }
+    } elseif (preg_match('/(?:<p>\s*)?(<a[^>]*\bdata-fancybox\b[^>]*>\s*<img\b[^>]*>\s*<\/a>)(?:\s*<\/p>)?/is', $rest, $imgMatch, PREG_OFFSET_CAPTURE)) {
+        $imgHtml = $imgMatch[1][0];
+        $full = $imgMatch[0][0];
+        $offset = $imgMatch[0][1];
+        $rest = substr($rest, 0, $offset) . substr($rest, $offset + strlen($full));
+        $figure = '<figure class="album-shot music-album-chapter-media" data-layout="auto">' . $imgHtml . '</figure>';
+        $layout = 'auto';
+    } else {
+        $chapterHtml = $h2 . '<div class="music-album-chapter-body">' . $rest . '</div>';
+        return array($chapterHtml, false, '', 'top', 'above', false);
+    }
+
+    list($layout, $pos, $titlepos, $wrap) = musicAlbumNormalizeShot($layout, $attrs);
+
+    if ($wrap) {
+        $assembled = $h2 . '<div class="music-album-chapter-body">' . $figure . $rest . '</div>';
+    } else {
+        $assembled = $h2 . "\n" . $figure . '<div class="music-album-chapter-body">' . $rest . '</div>';
+    }
+
+    return array($assembled, true, $layout, $pos, $titlepos, $wrap);
+}
+
+/**
  * 音乐相册文章内容：按 h2 分章 + sticky 章节目录结构
  */
 function exContentAlbum($content) {
@@ -147,6 +283,7 @@ function exContentAlbum($content) {
             $title = strip_tags($match[2]);
             $titleEsc = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
             $chapterId = 'music-album-ch-' . $index;
+            $num = $index + 1;
 
             $part = preg_replace(
                 '/^<h2(\s[^>]*)?>/i',
@@ -155,8 +292,32 @@ function exContentAlbum($content) {
                 1
             );
 
-            $navItems .= '<li><a class="music-album-nav-link" href="#' . $chapterId . '" data-chapter="' . $index . '">' . $titleEsc . '</a></li>';
-            $sections .= '<section class="music-album-chapter" id="' . $chapterId . '" data-chapter="' . $index . '" aria-labelledby="' . $chapterId . '-title">' . $part . '</section>';
+            list($part, $hasMedia, $shotLayout, $shotPos, $shotTitlepos, $shotWrap) = musicAlbumEnhanceChapterMedia($part);
+            $chapterClass = 'music-album-chapter';
+            $extraAttrs = '';
+            if ($hasMedia) {
+                $chapterClass .= ' has-media';
+                if ($shotLayout === 'board') {
+                    $chapterClass .= ' has-board';
+                } else {
+                    $chapterClass .= ' shot-pos-' . htmlspecialchars($shotPos, ENT_QUOTES, 'UTF-8');
+                    $chapterClass .= ' shot-title-' . htmlspecialchars($shotTitlepos, ENT_QUOTES, 'UTF-8');
+                    if ($shotWrap) {
+                        $chapterClass .= ' shot-wrap';
+                    }
+                    if ($shotLayout === 'auto') {
+                        $chapterClass .= ' shot-auto';
+                    }
+                }
+                $extraAttrs .= ' data-layout="' . htmlspecialchars($shotLayout, ENT_QUOTES, 'UTF-8') . '"';
+            }
+
+            $navItems .= '<li><a class="music-album-nav-link" href="#' . $chapterId . '" data-chapter="' . $index . '">'
+                . '<span class="music-album-nav-index">' . $num . '</span>'
+                . '<span class="music-album-nav-title">' . $titleEsc . '</span>'
+                . '</a></li>';
+            $sections .= '<section class="' . $chapterClass . '" id="' . $chapterId . '" data-chapter="' . $index . '"'
+                . $extraAttrs . ' aria-labelledby="' . $chapterId . '-title">' . $part . '</section>';
             $index++;
         } else {
             $sections .= '<div class="music-album-intro">' . $part . '</div>';
@@ -167,9 +328,17 @@ function exContentAlbum($content) {
         return '<div class="music-album-body">' . $content . '</div>';
     }
 
-    $nav = '<nav class="music-album-nav" aria-label="章节导航">';
-    $nav .= '<p class="music-album-nav-label"><i class="czs-music-l"></i> 章节</p>';
-    $nav .= '<ol class="music-album-nav-list">' . $navItems . '</ol></nav>';
+    $nav = '<nav class="music-album-nav' . ($index > 10 ? ' is-dense' : '') . '" aria-label="章节导航" data-total="' . $index . '">';
+    $nav .= '<p class="music-album-nav-now" data-ma-now hidden></p>';
+    $nav .= '<button type="button" class="music-album-nav-toggle" aria-expanded="false" aria-controls="music-album-nav-panel" title="章节">';
+    $nav .= '<span class="music-album-nav-toggle-text">章节</span>';
+    $nav .= '</button>';
+    $nav .= '<div class="music-album-nav-panel" id="music-album-nav-panel">';
+    $nav .= '<div class="music-album-nav-head">';
+    $nav .= '<span class="music-album-nav-progress-text" data-ma-progress>1 / ' . $index . '</span>';
+    $nav .= '</div>';
+    $nav .= '<ol class="music-album-nav-list">' . $navItems . '</ol>';
+    $nav .= '</div></nav>';
 
     return '<div class="music-album-layout">' . $nav . '<div class="music-album-body">' . $sections . '</div></div>';
 }

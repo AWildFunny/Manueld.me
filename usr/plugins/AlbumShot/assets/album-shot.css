@@ -1,0 +1,50 @@
+/* AlbumShot — standalone figure (album page layouts live in theme music-album.css) */
+.album-shot {
+    margin: 0 0 1rem;
+    padding: 0;
+    border: none;
+}
+
+.album-shot a {
+    display: block;
+    line-height: 0;
+}
+
+.album-shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+
+.album-shot figcaption {
+    margin: 0.4rem 0 0;
+    font-size: 0.85rem;
+    color: var(--muted-color, #667);
+}
+
+.album-board {
+    position: relative;
+    width: 100%;
+    margin: 0 0 1rem;
+}
+
+.album-board-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--board-ratio, 3 / 2);
+}
+
+.album-board-item {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.album-board-item img {
+    display: block;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+}
