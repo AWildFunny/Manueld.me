@@ -345,6 +345,36 @@
     cursor: nwse-resize;
 }
 
+.as-board-remove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    z-index: 3;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #b91c1c;
+    color: #fff;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.as-board-item:hover .as-board-remove,
+.as-board-item.is-on .as-board-remove {
+    opacity: 1;
+}
+
+.as-board-remove:hover {
+    background: #991b1b;
+}
+
 .ci-inline-fields {
     display: grid;
     grid-template-columns: 1fr 1fr;

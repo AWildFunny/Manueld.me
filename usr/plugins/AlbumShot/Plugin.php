@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.3.0
+ * @version 1.3.1
  * @dependence 9.9.2-*
  */
 
@@ -241,8 +241,8 @@ HTML;
             'boot' => array(
                 'images' => self::listImageAttachments(),
             ),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.3.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.3.0'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.3.1'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.3.1'),
         ));
     }
 
@@ -463,7 +463,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.3.0';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.3.1';
         echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }

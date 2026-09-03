@@ -172,53 +172,87 @@
         return Math.max(a, Math.min(b, n));
     }
 
-    function applyPreset(kind, urls) {
-        urls = (urls || []).filter(Boolean);
-        if (!urls.length && items.length) {
-            urls = items.map(function (it) { return it.src; });
+    /** 构图槽位（只排已有图，绝不复制同一张去填空槽） */
+    function presetSlots(kind) {
+        if (kind === 'duo-split') {
+            return [
+                { x: 2, y: 6, w: 47 },
+                { x: 51, y: 6, w: 47 }
+            ];
         }
-        if (kind === 'canvas') {
+        if (kind === 'duo-main-side') {
+            return [
+                { x: 2, y: 5, w: 60 },
+                { x: 64, y: 22, w: 34 }
+            ];
+        }
+        if (kind === 'duo-overlap') {
+            return [
+                { x: 5, y: 8, w: 58 },
+                { x: 40, y: 24, w: 52 }
+            ];
+        }
+        if (kind === 'tri-stack') {
+            return [
+                { x: 2, y: 4, w: 58 },
+                { x: 62, y: 4, w: 36 },
+                { x: 62, y: 50, w: 36 }
+            ];
+        }
+        if (kind === 'tri-row') {
+            return [0, 1, 2].map(function (i) {
+                return { x: 2 + i * 32.5, y: 10, w: 31 };
+            });
+        }
+        if (kind === 'quad') {
+            return [
+                { x: 2, y: 4, w: 47 },
+                { x: 51, y: 4, w: 47 },
+                { x: 2, y: 50, w: 47 },
+                { x: 51, y: 50, w: 47 }
+            ];
+        }
+        return [];
+    }
+
+    function applyPreset(kind) {
+        if (!kind || kind === 'canvas' || !items.length) {
             return;
         }
-        var next = [];
-        function take(i) { return urls[i] || urls[urls.length - 1] || ''; }
-        if (kind === 'duo-split') {
-            next = [
-                { src: take(0), x: 2, y: 6, w: 47, alt: '' },
-                { src: take(1), x: 51, y: 6, w: 47, alt: '' }
-            ];
-        } else if (kind === 'duo-main-side') {
-            next = [
-                { src: take(0), x: 2, y: 5, w: 60, alt: '' },
-                { src: take(1), x: 64, y: 22, w: 34, alt: '' }
-            ];
-        } else if (kind === 'duo-overlap') {
-            next = [
-                { src: take(0), x: 5, y: 8, w: 58, alt: '' },
-                { src: take(1), x: 40, y: 24, w: 52, alt: '' }
-            ];
-        } else if (kind === 'tri-stack') {
-            next = [
-                { src: take(0), x: 2, y: 4, w: 58, alt: '' },
-                { src: take(1), x: 62, y: 4, w: 36, alt: '' },
-                { src: take(2), x: 62, y: 50, w: 36, alt: '' }
-            ];
-        } else if (kind === 'tri-row') {
-            next = [0, 1, 2].map(function (i) {
-                return { src: take(i), x: 2 + i * 32.5, y: 10, w: 31, alt: '' };
-            });
-        } else if (kind === 'quad') {
-            next = [
-                { src: take(0), x: 2, y: 4, w: 47, alt: '' },
-                { src: take(1), x: 51, y: 4, w: 47, alt: '' },
-                { src: take(2), x: 2, y: 50, w: 47, alt: '' },
-                { src: take(3), x: 51, y: 50, w: 47, alt: '' }
-            ];
+        var slots = presetSlots(kind);
+        if (!slots.length) {
+            return;
         }
-        if (next.length) {
-            items = next.filter(function (it) { return !!it.src; });
-            selected = 0;
+        items.forEach(function (it, i) {
+            if (i < slots.length) {
+                it.x = slots[i].x;
+                it.y = slots[i].y;
+                it.w = slots[i].w;
+            } else {
+                // 超出构图槽位：错开叠放，保留用户已加的图
+                it.x = clamp(6 + ((i - slots.length) % 3) * 8, 0, 88);
+                it.y = clamp(8 + ((i - slots.length) % 4) * 10, 0, 88);
+                it.w = 36;
+            }
+        });
+        if (selected >= items.length) {
+            selected = Math.max(0, items.length - 1);
         }
+    }
+
+    function removeItem(index) {
+        if (index < 0 || index >= items.length) {
+            return;
+        }
+        items.splice(index, 1);
+        if (selected >= items.length) {
+            selected = Math.max(0, items.length - 1);
+        }
+        if (cat() !== 'canvas' && items.length) {
+            applyPreset($('#as-preset').val() || 'duo-split');
+        }
+        paintBoard();
+        renderLibrary();
     }
 
     function ratioCss() {
@@ -227,7 +261,7 @@
 
     function boardEditorHtml() {
         return '<div class="as-board-ui as-drop-stage" data-as-drop="1">'
-            + '<p class="as-board-hint">从右侧拖图到此 · 画布内可拖动排版 · 右下角缩放</p>'
+            + '<p class="as-board-hint">从右侧拖图到此 · 画布内拖动排版 · 角标删除 · 右下角缩放</p>'
             + '<div id="as-board" class="as-board" style="--board-ratio:' + ratioCss() + '"></div>'
             + '</div>';
     }
@@ -245,6 +279,7 @@
         var html = '';
         items.forEach(function (it, i) {
             html += '<figure class="as-board-item' + (i === selected ? ' is-on' : '') + '" data-i="' + i + '" style="left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%">'
+                + '<button type="button" class="as-board-remove" data-remove="' + i + '" title="从画布移除" aria-label="移除">×</button>'
                 + '<img src="' + escapeHtml(it.src) + '" alt="">'
                 + '<i class="as-board-handle" data-resize="' + i + '"></i>'
                 + '</figure>';
@@ -266,7 +301,7 @@
         });
         selected = items.length - 1;
         if (cat() !== 'canvas') {
-            applyPreset($('#as-preset').val() || 'duo-split', items.map(function (it) { return it.src; }));
+            applyPreset($('#as-preset').val() || 'duo-split');
         }
         paintBoard();
         renderLibrary();
@@ -426,7 +461,7 @@
         $(document).on('change', '#as-cat', function () {
             syncUi();
             if (isBoardMode() && items.length && cat() !== 'canvas') {
-                applyPreset($('#as-preset').val(), items.map(function (it) { return it.src; }));
+                applyPreset($('#as-preset').val());
             }
             if (window.CI_refreshPreview) window.CI_refreshPreview();
             window.setTimeout(function () {
@@ -441,10 +476,33 @@
         });
 
         $(document).on('change', '#as-preset', function () {
-            applyPreset($(this).val(), items.map(function (it) { return it.src; }));
+            applyPreset($(this).val());
             paintBoard();
             renderLibrary();
             if (window.CI_refreshPreview) window.CI_refreshPreview();
+        });
+
+        $(document).on('click', '.as-board-remove', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            removeItem(parseInt($(this).attr('data-remove'), 10));
+        });
+
+        $(document).on('keydown', function (e) {
+            if ($('#ci-inserter-modal').prop('hidden') || $('#ci-panel-album-shot').prop('hidden')) {
+                return;
+            }
+            if (!isBoardMode() || !items.length) {
+                return;
+            }
+            var tag = (e.target && e.target.tagName) || '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+                return;
+            }
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                removeItem(selected);
+            }
         });
 
         $(document).on('change', '#as-ratio', function () {
@@ -518,7 +576,7 @@
         });
 
         $(document).on('mousedown', '.as-board-item', function (e) {
-            if ($(e.target).hasClass('as-board-handle')) return;
+            if ($(e.target).closest('.as-board-handle, .as-board-remove').length) return;
             var i = parseInt($(this).data('i'), 10);
             selected = i;
             var $board = $('#as-board');
