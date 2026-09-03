@@ -22,7 +22,11 @@
 多图 / 画布：
 
 ```
+<div>
 [album-board ratio="3:2"][img src="https://..." x="2" y="6" w="47"][img src="https://..." x="51" y="6" w="47"][/album-board]
+</div>
 ```
 
 `x` `y` `w` 为相对画幅的百分比。图片高度随自身宽高比，不拉伸。
+
+**Markdown 注意**：相邻 `[...][...]` 会被解析成引用链接。组件插入会自动包一层 `<div>`；手写时也请包在 HTML 块内。从 1.1 升到 1.2 后请在后台对 AlbumShot **禁用再启用**，以注册 Markdown 保护钩子。

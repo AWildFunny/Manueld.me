@@ -1,3 +1,35 @@
+.as-src-thumb {
+    display: block;
+    margin-top: 8px;
+    max-width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #eef1f4;
+    border: 1px solid #d5dde5;
+}
+
+.as-src-thumb img {
+    display: block;
+    width: 100%;
+    max-height: 160px;
+    height: auto;
+    object-fit: contain;
+    background: #f7f8fa;
+}
+
+.as-src-thumb.is-broken::after {
+    content: "图片加载失败，请检查 URL";
+    display: block;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: #b45309;
+    background: #fff7ed;
+}
+
+.as-src-thumb.is-broken img {
+    display: none;
+}
+
 .as-preview-chapter {
     --as-primary: #4E7289;
     font-size: 12px;

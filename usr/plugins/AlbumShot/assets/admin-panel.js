@@ -198,15 +198,67 @@
         paintBoard();
     }
 
+    function previewLayoutClass() {
+        var layout = $('#as-layout').val() || 'auto';
+        var pos = $('#as-pos').val() || 'top';
+        var titlepos = $('#as-titlepos').val() || 'above';
+        var wrap = $('#as-wrap').prop('checked');
+        var cls = ['as-preview-chapter'];
+        if (layout === 'overlay' || (layout === 'custom' && titlepos === 'on')) {
+            cls.push('is-overlay');
+        } else if (layout === 'split-left' || (layout === 'custom' && titlepos === 'beside' && pos === 'left')) {
+            cls.push('is-split', 'is-split-left');
+        } else if (layout === 'split-right' || (layout === 'custom' && titlepos === 'beside' && pos === 'right')) {
+            cls.push('is-split', 'is-split-right');
+        } else if (layout === 'float' || (layout === 'custom' && wrap)) {
+            cls.push('is-float');
+            if (layout === 'float' && pos === 'right') cls.push('is-right');
+            if (layout === 'custom' && pos === 'right') cls.push('is-right');
+        } else if (layout === 'custom' && titlepos === 'below') {
+            cls.push('is-below');
+        } else if (layout === 'banner' || layout === 'auto') {
+            cls.push('is-banner');
+        }
+        return cls.join(' ');
+    }
+
+    function syncSrcThumb() {
+        var src = $.trim($('#as-src').val());
+        var $thumb = $('#as-src-thumb');
+        if (!$thumb.length) return;
+        if (!src || !/^(https?:\/\/|\/)/i.test(src)) {
+            $thumb.prop('hidden', true).find('img').attr('src', '');
+            return;
+        }
+        $thumb.prop('hidden', false);
+        $thumb.removeClass('is-broken');
+        $thumb.find('img').attr('src', src).off('error.as').on('error.as', function () {
+            $thumb.addClass('is-broken');
+        });
+    }
+
     function singlePreviewHtml() {
         var src = $.trim($('#as-src').val());
         var alt = $.trim($('#as-alt').val()) || '章节标题';
         var layout = $('#as-layout').val() || 'auto';
         var media = src
             ? '<div class="as-preview-media"><img src="' + escapeHtml(src) + '" alt=""></div>'
-            : '<div class="as-preview-media"><div class="as-preview-ph">选择图片后在此预览</div></div>';
-        return '<div class="as-preview-chapter"><h4>' + escapeHtml(alt) + '</h4>' + media
-            + '<p class="as-preview-body">单图按原比例显示，不再裁切拉伸。版式：' + escapeHtml(layout) + '</p></div>';
+            : '<div class="as-preview-media"><div class="as-preview-ph">填写或选择图片 URL 后在此预览</div></div>';
+        var title = '<h4>' + escapeHtml(alt) + '</h4>';
+        var body = '<p class="as-preview-body">单图按原比例显示。当前版式：' + escapeHtml(layout) + '</p>';
+        var cls = previewLayoutClass();
+        if (cls.indexOf('is-overlay') !== -1) {
+            return '<div class="' + cls + '">' + media + title + body + '</div>';
+        }
+        if (cls.indexOf('is-below') !== -1) {
+            return '<div class="' + cls + '">' + media + title + body + '</div>';
+        }
+        return '<div class="' + cls + '">' + title + media + body + '</div>';
+    }
+
+    /** Markdown 会把相邻 [a][b] 当成引用链接；包进 HTML 块可兜底 */
+    function wrapForMarkdown(code) {
+        return '<div>\n' + code + '\n</div>';
     }
 
     function buildShortcode() {
@@ -229,7 +281,7 @@
                 parts.push('titlepos="' + escapeAttr($('#as-titlepos').val() || 'above') + '"');
                 if ($('#as-wrap').prop('checked')) parts.push('wrap="1"');
             }
-            return '[album-shot ' + parts.join(' ') + ']';
+            return wrapForMarkdown('[album-shot ' + parts.join(' ') + ']');
         }
         if (items.length < 1) {
             window.alert('请至少加入一张图片');
@@ -240,7 +292,7 @@
             return '[img src="' + escapeAttr(it.src) + '" x="' + it.x + '" y="' + it.y + '" w="' + it.w + '"'
                 + (it.alt ? ' alt="' + escapeAttr(it.alt) + '"' : '') + ']';
         }).join('');
-        return '[album-board ratio="' + escapeAttr(ratio) + '"]' + inner + '[/album-board]';
+        return wrapForMarkdown('[album-board ratio="' + escapeAttr(ratio) + '"]' + inner + '[/album-board]');
     }
 
     function pctFromEvent(e, $board, isW) {
@@ -255,6 +307,7 @@
         onShow: function () {
             fillSelects();
             syncUi();
+            syncSrcThumb();
         },
         preview: function () {
             if (isBoardMode()) {
@@ -265,6 +318,7 @@
                 paintBoard();
                 return false;
             }
+            syncSrcThumb();
             return singlePreviewHtml();
         },
         insert: function (done) {
@@ -284,21 +338,32 @@
             if (window.CI_refreshPreview) window.CI_refreshPreview();
             window.setTimeout(paintBoard, 0);
         });
-        $(document).on('change', '#as-layout, #as-pos, #as-titlepos, #as-wrap, #as-src, #as-alt', function () {
+        var srcInputTimer = null;
+        $(document).on('change', '#as-layout, #as-pos, #as-titlepos, #as-wrap, #as-alt', function () {
             syncUi();
             if (window.CI_refreshPreview) window.CI_refreshPreview();
+        });
+        $(document).on('change input', '#as-src', function () {
+            syncSrcThumb();
+            window.clearTimeout(srcInputTimer);
+            srcInputTimer = window.setTimeout(function () {
+                if (window.CI_refreshPreview) window.CI_refreshPreview();
+            }, 280);
         });
         $(document).on('change', '#as-preset', function () {
             applyPreset($(this).val(), items.map(function (it) { return it.src; }));
             paintBoard();
+            if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
         $(document).on('change', '#as-ratio', function () {
             paintBoard();
             $('#as-board').css('--board-ratio', ratioCss());
+            if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
         $(document).on('change', '#as-src-pick', function () {
             var v = $(this).val();
             if (v) $('#as-src').val(v);
+            syncSrcThumb();
             if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
         $(document).on('change', '#as-board-pick', function () {

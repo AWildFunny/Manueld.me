@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.1.0
+ * @version 1.2.0
  * @dependence 9.9.2-*
  */
 
@@ -19,11 +19,13 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
 
     public static function activate()
     {
+        // 必须在 Markdown 转换前保护短代码：相邻 [a][b] 会被当成引用链接吃掉
+        Typecho_Plugin::factory('Widget_Abstract_Contents')->markdown = array('AlbumShot_Plugin', 'markdown');
         Typecho_Plugin::factory('Widget_Abstract_Contents')->contentEx = array('AlbumShot_Plugin', 'parse');
         Typecho_Plugin::factory('Widget_Archive')->header = array('AlbumShot_Plugin', 'header');
         Typecho_Plugin::factory('ComponentInserter')->collect = array('AlbumShot_Plugin', 'registerComponent');
 
-        return _t('图文融合已启用。在音乐相册章节的 ## 下方插入 [album-shot ...]；写文章侧栏「组件插入」可预览。');
+        return _t('图文融合已启用。在音乐相册章节的 ## 下方插入 [album-shot ...]；写文章侧栏「组件插入」可预览。若从旧版升级，请禁用后再启用一次以刷新钩子。');
     }
 
     public static function deactivate() {}
@@ -107,6 +109,7 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
     <label for="as-src">图片 URL <span class="ci-req">*</span></label>
     <input type="text" id="as-src" class="text w-100 mono" placeholder="https://... 或从附件选择">
     <select id="as-src-pick" class="w-100"><option value="">— 从已上传附件选择图片 —</option></select>
+    <span id="as-src-thumb" class="as-src-thumb" hidden><img alt="预览"></span>
   </p>
   <p>
     <label for="as-alt">说明 / alt</label>
@@ -154,9 +157,26 @@ HTML;
             'order' => 15,
             'panelHtml' => $panelHtml,
             'boot' => array(),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.1.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.1.0'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.2.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.2.0'),
         ));
+    }
+
+    /**
+     * Markdown 转换前先把短代码变成 HTML，避免 [board][img] 被当成引用链接。
+     * 接管 markdown 钩子后需自行调用 Utils\Markdown::convert。
+     */
+    public static function markdown($text, $lastResult = null)
+    {
+        $text = ($lastResult === null || $lastResult === '') ? $text : $lastResult;
+        $text = self::parse($text, null, null);
+        if (class_exists('\\Utils\\Markdown')) {
+            return \Utils\Markdown::convert($text);
+        }
+        if (class_exists('Markdown')) {
+            return Markdown::convert($text);
+        }
+        return $text;
     }
 
     public static function parse($content, $widget, $lastResult)
