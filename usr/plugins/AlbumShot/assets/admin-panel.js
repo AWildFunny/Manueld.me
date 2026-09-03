@@ -1,9 +1,13 @@
 (function ($) {
     'use strict';
 
+    var bootRoot = window.CI_BOOT || {};
+    var boot = (bootRoot.components && bootRoot.components['album-shot']) || {};
+    var library = [];
     var items = [];
     var selected = 0;
     var drag = null;
+    var libDragUrl = '';
 
     function escapeHtml(v) {
         return window.CI_escapeHtml ? window.CI_escapeHtml(v) : String(v || '')
@@ -17,46 +21,116 @@
 
     function isImageUrl(url, name) {
         var s = ((url || '') + ' ' + (name || '')).toLowerCase();
-        return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|#|$)/i.test(s) || /image\//i.test(s);
+        return /\.(jpe?g|png|gif|webp|bmp|svg|avif|tiff?)(\?|#|$)/i.test(s) || /image\//i.test(s);
     }
 
-    function collectImages() {
+    function isUsableUrl(url) {
+        return !!(url && /^(https?:\/\/|\/)/i.test(url) && url.indexOf('###') !== 0);
+    }
+
+    /** 从写文章页 #file-list 刮取；真实地址在 li[data-url]，href 常为 ### */
+    function scrapeDomImages() {
         var images = [];
         $('#file-list li').each(function () {
             var $li = $(this);
-            var $insert = $li.find('a.insert').first();
-            if (!$insert.length) return;
-            var url = $insert.attr('href') || $insert.data('url') || '';
-            var name = $.trim($insert.text()) || $li.text();
-            if (!url || url.indexOf('javascript:') === 0) {
-                var $url = $li.find('input[name="attachment[]"], .url, code').first();
-                if ($url.length) url = $url.val() || $url.text() || '';
+            var url = $li.attr('data-url') || $li.data('url') || '';
+            var isImage = $li.attr('data-image');
+            if (isImage === '0' || isImage === 0) {
+                return;
             }
-            if ((!url || url.indexOf('javascript:') === 0) && $insert.attr('onclick')) {
-                var m = $insert.attr('onclick').match(/['"](https?:\/\/[^'"]+|\/[^'"]+)['"]/);
+            var $insert = $li.find('a.insert').first();
+            var name = $.trim($insert.text()) || $.trim($li.text()) || 'image';
+            if (!isUsableUrl(url)) {
+                var href = $insert.attr('href') || '';
+                if (isUsableUrl(href)) {
+                    url = href;
+                }
+            }
+            if (!isUsableUrl(url) && $insert.attr('onclick')) {
+                var m = String($insert.attr('onclick')).match(/['"](https?:\/\/[^'"]+|\/[^'"]+)['"]/);
                 if (m) url = m[1];
             }
-            if (!url || url.indexOf('javascript:') === 0) return;
-            if (isImageUrl(url, name)) images.push({ url: url, name: name });
+            if (!isUsableUrl(url)) {
+                return;
+            }
+            if (isImage === '1' || isImage === 1 || isImageUrl(url, name)) {
+                images.push({ url: url, name: name });
+            }
         });
         return images;
     }
 
-    function fillSelects() {
-        var html = '<option value="">— 从已上传附件选择图片 —</option>';
-        collectImages().forEach(function (item) {
-            html += '<option value="' + escapeHtml(item.url) + '">' + escapeHtml(item.name) + '</option>';
+    function mergeLibrary(extra) {
+        var map = {};
+        var out = [];
+        function push(item) {
+            if (!item || !isUsableUrl(item.url)) {
+                return;
+            }
+            if (map[item.url]) {
+                return;
+            }
+            map[item.url] = true;
+            out.push({
+                url: item.url,
+                name: item.name || item.url.split('/').pop() || 'image'
+            });
+        }
+        (Array.isArray(boot.images) ? boot.images : []).forEach(push);
+        (extra || []).forEach(push);
+        scrapeDomImages().forEach(push);
+        library = out;
+        return library;
+    }
+
+    function currentSrc() {
+        return $.trim($('#as-src').val());
+    }
+
+    function setSrc(url) {
+        $('#as-src').val(url || '');
+        renderLibrary();
+        if (window.CI_refreshPreview) {
+            window.CI_refreshPreview();
+        }
+    }
+
+    function renderLibrary() {
+        var $grid = $('#as-lib-grid');
+        var $empty = $('#as-lib-empty');
+        var $count = $('#as-lib-count');
+        if (!$grid.length) {
+            return;
+        }
+        $count.text(String(library.length));
+        if (!library.length) {
+            $grid.empty();
+            $empty.prop('hidden', false);
+            return;
+        }
+        $empty.prop('hidden', true);
+        var src = currentSrc();
+        var boardUrls = {};
+        items.forEach(function (it) {
+            if (it.src) boardUrls[it.src] = true;
         });
-        var $src = $('#as-src-pick');
-        var $board = $('#as-board-pick');
-        if ($src.length) {
-            var cur = $src.val();
-            $src.html(html);
-            if (cur) $src.val(cur);
-        }
-        if ($board.length) {
-            $board.html(html.replace('选择图片', '加入画布'));
-        }
+        var html = '';
+        library.forEach(function (item, idx) {
+            var on = src === item.url || !!boardUrls[item.url];
+            html += '<button type="button" class="as-lib-card' + (on ? ' is-on' : '') + '" draggable="true"'
+                + ' data-url="' + escapeHtml(item.url) + '"'
+                + ' data-idx="' + idx + '"'
+                + ' title="' + escapeHtml(item.name) + '">'
+                + '<span class="as-lib-thumb"><img src="' + escapeHtml(item.url) + '" alt="" loading="lazy"></span>'
+                + '<span class="as-lib-name">' + escapeHtml(item.name) + '</span>'
+                + '</button>';
+        });
+        $grid.html(html);
+    }
+
+    function refreshLibrary() {
+        mergeLibrary();
+        renderLibrary();
     }
 
     function cat() {
@@ -69,12 +143,13 @@
 
     function syncUi() {
         var board = isBoardMode();
-        $('#as-single-wrap').prop('hidden', board);
-        $('#as-board-wrap').prop('hidden', !board);
-        $('#as-custom-wrap').prop('hidden', !board && $('#as-layout').val() !== 'custom' ? true : ($('#as-layout').val() !== 'custom'));
-        if (!board) {
-            $('#as-custom-wrap').prop('hidden', ($('#as-layout').val() || '') !== 'custom');
-        }
+        $('#as-layout-field').prop('hidden', board);
+        $('#as-alt-wrap').prop('hidden', board);
+        $('#as-preset-field').prop('hidden', !board);
+        $('#as-ratio-field').prop('hidden', !board);
+        $('#as-board-clear').prop('hidden', !board);
+        $('#as-custom-wrap').prop('hidden', board || ($('#as-layout').val() || '') !== 'custom');
+
         var presets = {
             duo: ['duo-split', 'duo-main-side', 'duo-overlap'],
             multi: ['tri-stack', 'tri-row', 'quad'],
@@ -98,7 +173,7 @@
     }
 
     function applyPreset(kind, urls) {
-        urls = urls.filter(Boolean);
+        urls = (urls || []).filter(Boolean);
         if (!urls.length && items.length) {
             urls = items.map(function (it) { return it.src; });
         }
@@ -147,13 +222,12 @@
     }
 
     function ratioCss() {
-        var r = ($('#as-ratio').val() || '3:2').replace(':', ' / ');
-        return r;
+        return ($('#as-ratio').val() || '3:2').replace(':', ' / ');
     }
 
     function boardEditorHtml() {
-        return '<div class="as-board-ui">'
-            + '<p class="as-board-hint">拖拽排版 · 右下角缩放 · 保持原比例</p>'
+        return '<div class="as-board-ui as-drop-stage" data-as-drop="1">'
+            + '<p class="as-board-hint">从右侧拖图到此 · 画布内可拖动排版 · 右下角缩放</p>'
             + '<div id="as-board" class="as-board" style="--board-ratio:' + ratioCss() + '"></div>'
             + '</div>';
     }
@@ -165,7 +239,7 @@
         }
         $board.css('--board-ratio', ratioCss());
         if (!items.length) {
-            $board.html('<div class="as-board-empty">从右侧加入 2 张及以上图片</div>');
+            $board.html('<div class="as-board-empty">将右侧图片拖到此处，或点击选用</div>');
             return;
         }
         var html = '';
@@ -179,8 +253,8 @@
     }
 
     function addItem(url) {
-        if (!url || !/^(https?:\/\/|\/)/i.test(url)) {
-            return;
+        if (!isUsableUrl(url)) {
+            return false;
         }
         var n = items.length;
         items.push({
@@ -191,11 +265,27 @@
             alt: ''
         });
         selected = items.length - 1;
-        var catNow = cat();
-        if (catNow !== 'canvas') {
+        if (cat() !== 'canvas') {
             applyPreset($('#as-preset').val() || 'duo-split', items.map(function (it) { return it.src; }));
         }
         paintBoard();
+        renderLibrary();
+        return true;
+    }
+
+    function applyImage(url) {
+        if (!isUsableUrl(url)) {
+            return;
+        }
+        if (isBoardMode()) {
+            addItem(url);
+            if (!$('#as-board').length && window.CI_refreshPreview) {
+                window.CI_refreshPreview();
+            }
+            window.setTimeout(paintBoard, 0);
+        } else {
+            setSrc(url);
+        }
     }
 
     function previewLayoutClass() {
@@ -222,54 +312,38 @@
         return cls.join(' ');
     }
 
-    function syncSrcThumb() {
-        var src = $.trim($('#as-src').val());
-        var $thumb = $('#as-src-thumb');
-        if (!$thumb.length) return;
-        if (!src || !/^(https?:\/\/|\/)/i.test(src)) {
-            $thumb.prop('hidden', true).find('img').attr('src', '');
-            return;
-        }
-        $thumb.prop('hidden', false);
-        $thumb.removeClass('is-broken');
-        $thumb.find('img').attr('src', src).off('error.as').on('error.as', function () {
-            $thumb.addClass('is-broken');
-        });
-    }
-
     function singlePreviewHtml() {
-        var src = $.trim($('#as-src').val());
+        var src = currentSrc();
         var alt = $.trim($('#as-alt').val()) || '章节标题';
         var layout = $('#as-layout').val() || 'auto';
         var media = src
             ? '<div class="as-preview-media"><img src="' + escapeHtml(src) + '" alt=""></div>'
-            : '<div class="as-preview-media"><div class="as-preview-ph">填写或选择图片 URL 后在此预览</div></div>';
+            : '<div class="as-preview-media"><div class="as-preview-ph">将右侧图片拖到此处，或点击选用</div></div>';
         var title = '<h4>' + escapeHtml(alt) + '</h4>';
         var body = '<p class="as-preview-body">单图按原比例显示。当前版式：' + escapeHtml(layout) + '</p>';
         var cls = previewLayoutClass();
-        if (cls.indexOf('is-overlay') !== -1) {
-            return '<div class="' + cls + '">' + media + title + body + '</div>';
+        var inner;
+        if (cls.indexOf('is-overlay') !== -1 || cls.indexOf('is-below') !== -1) {
+            inner = media + title + body;
+        } else {
+            inner = title + media + body;
         }
-        if (cls.indexOf('is-below') !== -1) {
-            return '<div class="' + cls + '">' + media + title + body + '</div>';
-        }
-        return '<div class="' + cls + '">' + title + media + body + '</div>';
+        return '<div class="' + cls + ' as-drop-stage" data-as-drop="1">' + inner + '</div>';
     }
 
-    /** Markdown 会把相邻 [a][b] 当成引用链接；包进 HTML 块可兜底 */
     function wrapForMarkdown(code) {
         return '<div>\n' + code + '\n</div>';
     }
 
     function buildShortcode() {
         if (!isBoardMode()) {
-            var src = $.trim($('#as-src').val());
+            var src = currentSrc();
             if (!src) {
-                window.alert('请填写或选择图片 URL');
+                window.alert('请从右侧附件库选择或拖入一张图片');
                 return '';
             }
-            if (!/^(https?:\/\/|\/)/i.test(src)) {
-                window.alert('图片 URL 需以 http(s):// 或 / 开头');
+            if (!isUsableUrl(src)) {
+                window.alert('图片 URL 无效，请重新从附件库选用');
                 return '';
             }
             var layout = $('#as-layout').val() || 'auto';
@@ -295,30 +369,47 @@
         return wrapForMarkdown('[album-board ratio="' + escapeAttr(ratio) + '"]' + inner + '[/album-board]');
     }
 
-    function pctFromEvent(e, $board, isW) {
+    function pctFromEvent(e, $board) {
         var rect = $board[0].getBoundingClientRect();
-        var x = ((e.clientX - rect.left) / rect.width) * 100;
-        var y = ((e.clientY - rect.top) / rect.height) * 100;
-        return { x: x, y: y, w: rect.width, h: rect.height };
+        return {
+            x: ((e.clientX - rect.left) / rect.width) * 100,
+            y: ((e.clientY - rect.top) / rect.height) * 100
+        };
+    }
+
+    function setDropHighlight(on) {
+        $('#ci-preview, .ci-preview-stage, .as-drop-stage, #as-board')
+            .toggleClass('as-drop-over', !!on);
+    }
+
+    function bindDropZone() {
+        var $stage = $('#ci-preview').closest('.ci-preview-stage');
+        if (!$stage.length) {
+            $stage = $('#ci-preview');
+        }
+        $stage.attr('data-as-drop', '1');
     }
 
     window.CI_HANDLERS = window.CI_HANDLERS || {};
     window.CI_HANDLERS['album-shot'] = {
         onShow: function () {
-            fillSelects();
+            refreshLibrary();
             syncUi();
-            syncSrcThumb();
+            bindDropZone();
         },
         preview: function () {
             if (isBoardMode()) {
                 if (!$('#as-board').length) {
-                    window.setTimeout(paintBoard, 0);
+                    window.setTimeout(function () {
+                        paintBoard();
+                        bindDropZone();
+                    }, 0);
                     return boardEditorHtml();
                 }
                 paintBoard();
                 return false;
             }
-            syncSrcThumb();
+            window.setTimeout(bindDropZone, 0);
             return singlePreviewHtml();
         },
         insert: function (done) {
@@ -330,61 +421,102 @@
     };
 
     $(function () {
+        mergeLibrary();
+
         $(document).on('change', '#as-cat', function () {
             syncUi();
             if (isBoardMode() && items.length && cat() !== 'canvas') {
                 applyPreset($('#as-preset').val(), items.map(function (it) { return it.src; }));
             }
             if (window.CI_refreshPreview) window.CI_refreshPreview();
-            window.setTimeout(paintBoard, 0);
+            window.setTimeout(function () {
+                paintBoard();
+                renderLibrary();
+            }, 0);
         });
-        var srcInputTimer = null;
+
         $(document).on('change', '#as-layout, #as-pos, #as-titlepos, #as-wrap, #as-alt', function () {
             syncUi();
             if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
-        $(document).on('change input', '#as-src', function () {
-            syncSrcThumb();
-            window.clearTimeout(srcInputTimer);
-            srcInputTimer = window.setTimeout(function () {
-                if (window.CI_refreshPreview) window.CI_refreshPreview();
-            }, 280);
-        });
+
         $(document).on('change', '#as-preset', function () {
             applyPreset($(this).val(), items.map(function (it) { return it.src; }));
             paintBoard();
+            renderLibrary();
             if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
+
         $(document).on('change', '#as-ratio', function () {
             paintBoard();
             $('#as-board').css('--board-ratio', ratioCss());
             if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
-        $(document).on('change', '#as-src-pick', function () {
-            var v = $(this).val();
-            if (v) $('#as-src').val(v);
-            syncSrcThumb();
-            if (window.CI_refreshPreview) window.CI_refreshPreview();
+
+        $(document).on('click', '#as-lib-refresh', function (e) {
+            e.preventDefault();
+            refreshLibrary();
         });
-        $(document).on('change', '#as-board-pick', function () {
-            addItem($(this).val());
-            $(this).val('');
-            if (!$('#as-board').length && window.CI_refreshPreview) window.CI_refreshPreview();
-            window.setTimeout(paintBoard, 0);
-        });
-        $(document).on('keydown', '#as-board-url', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addItem($.trim($(this).val()));
-                $(this).val('');
-                if (!$('#as-board').length && window.CI_refreshPreview) window.CI_refreshPreview();
-                window.setTimeout(paintBoard, 0);
-            }
-        });
+
         $(document).on('click', '#as-board-clear', function () {
             items = [];
             paintBoard();
+            renderLibrary();
         });
+
+        $(document).on('click', '.as-lib-card', function (e) {
+            e.preventDefault();
+            applyImage($(this).attr('data-url') || '');
+        });
+
+        $(document).on('dragstart', '.as-lib-card', function (e) {
+            libDragUrl = $(this).attr('data-url') || '';
+            $(this).addClass('is-dragging');
+            try {
+                e.originalEvent.dataTransfer.setData('text/plain', libDragUrl);
+                e.originalEvent.dataTransfer.effectAllowed = 'copy';
+            } catch (err) {}
+        });
+
+        $(document).on('dragend', '.as-lib-card', function () {
+            $(this).removeClass('is-dragging');
+            libDragUrl = '';
+            setDropHighlight(false);
+        });
+
+        $(document).on('dragover', '#ci-preview, .ci-preview-stage, .as-drop-stage, #as-board', function (e) {
+            if (!$('#ci-panel-album-shot').length || $('#ci-panel-album-shot').prop('hidden')) {
+                return;
+            }
+            e.preventDefault();
+            try {
+                e.originalEvent.dataTransfer.dropEffect = 'copy';
+            } catch (err) {}
+            setDropHighlight(true);
+        });
+
+        $(document).on('dragleave', '#ci-preview, .ci-preview-stage, .as-drop-stage, #as-board', function (e) {
+            var related = e.relatedTarget;
+            if (related && this.contains && this.contains(related)) {
+                return;
+            }
+            setDropHighlight(false);
+        });
+
+        $(document).on('drop', '#ci-preview, .ci-preview-stage, .as-drop-stage, #as-board', function (e) {
+            if (!$('#ci-panel-album-shot').length || $('#ci-panel-album-shot').prop('hidden')) {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            setDropHighlight(false);
+            var url = libDragUrl;
+            try {
+                url = url || e.originalEvent.dataTransfer.getData('text/plain') || '';
+            } catch (err) {}
+            applyImage($.trim(url));
+        });
+
         $(document).on('mousedown', '.as-board-item', function (e) {
             if ($(e.target).hasClass('as-board-handle')) return;
             var i = parseInt($(this).data('i'), 10);
@@ -400,6 +532,7 @@
             paintBoard();
             e.preventDefault();
         });
+
         $(document).on('mousedown', '.as-board-handle', function (e) {
             var i = parseInt($(this).data('resize'), 10);
             selected = i;
@@ -407,6 +540,7 @@
             e.preventDefault();
             e.stopPropagation();
         });
+
         $(document).on('mousemove', function (e) {
             if (!drag || !items[drag.i]) return;
             var it = items[drag.i];
@@ -418,11 +552,35 @@
                 var dw = (e.clientX - drag.startX) / Math.max($('#as-board').width(), 1) * 100;
                 it.w = clamp(Math.round(drag.startW + dw), 12, 96);
             }
-            var $el = $('.as-board-item[data-i="' + drag.i + '"]');
-            $el.css({ left: it.x + '%', top: it.y + '%', width: it.w + '%' });
+            $('.as-board-item[data-i="' + drag.i + '"]').css({
+                left: it.x + '%',
+                top: it.y + '%',
+                width: it.w + '%'
+            });
         });
+
         $(document).on('mouseup', function () {
             drag = null;
         });
+
+        // 上传完成后自动刷新图库
+        if (window.MutationObserver && document.body) {
+            var libObserver = new MutationObserver(function () {
+                window.clearTimeout(window.__asLibTimer);
+                window.__asLibTimer = window.setTimeout(refreshLibrary, 400);
+            });
+            var watchList = function () {
+                var el = document.getElementById('file-list');
+                if (el) {
+                    libObserver.observe(el, { childList: true, subtree: true });
+                }
+            };
+            watchList();
+            var panel = document.getElementById('upload-panel');
+            if (panel) {
+                libObserver.observe(panel, { childList: true, subtree: false });
+                window.setTimeout(watchList, 0);
+            }
+        }
     });
 })(window.jQuery);

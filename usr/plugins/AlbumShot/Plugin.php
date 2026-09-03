@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.2.0
+ * @version 1.3.0
  * @dependence 9.9.2-*
  */
 
@@ -25,7 +25,7 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
         Typecho_Plugin::factory('Widget_Archive')->header = array('AlbumShot_Plugin', 'header');
         Typecho_Plugin::factory('ComponentInserter')->collect = array('AlbumShot_Plugin', 'registerComponent');
 
-        return _t('图文融合已启用。在音乐相册章节的 ## 下方插入 [album-shot ...]；写文章侧栏「组件插入」可预览。若从旧版升级，请禁用后再启用一次以刷新钩子。');
+        return _t('图文融合已启用。写文章侧栏「组件插入」可从附件库拖图到预览区。若从旧版升级，请禁用后再启用一次。');
     }
 
     public static function deactivate() {}
@@ -50,6 +50,88 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
         return class_exists('ComponentInserter_Registry');
     }
 
+    /**
+     * 收集可插入的图片附件（优先本文，再补近期其它）
+     * @return array
+     */
+    private static function listImageAttachments()
+    {
+        $images = array();
+        $seen = array();
+        $cid = 0;
+        if (isset($_REQUEST['cid'])) {
+            $cid = intval($_REQUEST['cid']);
+        }
+
+        try {
+            $db = Typecho_Db::get();
+            $options = Helper::options();
+            $uploadBase = defined('__TYPECHO_UPLOAD_URL__')
+                ? rtrim(__TYPECHO_UPLOAD_URL__, '/') . '/'
+                : rtrim($options->siteUrl, '/') . '/';
+
+            $pushRow = function ($row) use (&$images, &$seen, $uploadBase) {
+                if (empty($row['text'])) {
+                    return;
+                }
+                $data = @unserialize($row['text']);
+                if (!is_array($data) || empty($data['path'])) {
+                    return;
+                }
+                $ext = strtolower(isset($data['type']) ? $data['type'] : pathinfo($data['path'], PATHINFO_EXTENSION));
+                if (!in_array($ext, array('jpg', 'jpeg', 'gif', 'png', 'tiff', 'bmp', 'webp', 'avif'), true)) {
+                    return;
+                }
+                $path = str_replace('\\', '/', $data['path']);
+                // 与核心 Upload::attachmentHandle 默认逻辑一致
+                if (class_exists('Typecho_Common')) {
+                    $url = Typecho_Common::url(
+                        $path,
+                        defined('__TYPECHO_UPLOAD_URL__') ? __TYPECHO_UPLOAD_URL__ : Helper::options()->siteUrl
+                    );
+                } else {
+                    $url = rtrim($uploadBase, '/') . '/' . ltrim($path, '/');
+                }
+                if (isset($seen[$url])) {
+                    return;
+                }
+                $seen[$url] = true;
+                $images[] = array(
+                    'url' => $url,
+                    'name' => isset($row['title']) && $row['title'] !== '' ? $row['title'] : basename($path),
+                    'cid' => isset($row['cid']) ? intval($row['cid']) : 0,
+                );
+            };
+
+            if ($cid > 0) {
+                $mine = $db->fetchAll($db->select('cid', 'title', 'text')
+                    ->from('table.contents')
+                    ->where('type = ?', 'attachment')
+                    ->where('parent = ?', $cid)
+                    ->order('created', Typecho_Db::SORT_DESC)
+                    ->limit(80));
+                foreach ($mine as $row) {
+                    $pushRow($row);
+                }
+            }
+
+            $others = $db->fetchAll($db->select('cid', 'title', 'text')
+                ->from('table.contents')
+                ->where('type = ?', 'attachment')
+                ->order('created', Typecho_Db::SORT_DESC)
+                ->limit(100));
+            foreach ($others as $row) {
+                if (count($images) >= 120) {
+                    break;
+                }
+                $pushRow($row);
+            }
+        } catch (Exception $e) {
+        }
+
+        return $images;
+    }
+
     public static function registerComponent()
     {
         if (!self::loadCiRegistry()) {
@@ -58,97 +140,97 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
 
         $pluginUrl = Helper::options()->pluginUrl . '/AlbumShot/assets';
         $panelHtml = <<<'HTML'
-<p>
-  <label>分类</label>
-  <select id="as-cat" class="w-100">
-    <option value="single">单图 · 与标题排版</option>
-    <option value="duo">双图</option>
-    <option value="multi">多图</option>
-    <option value="canvas">自由画布（可拖拽）</option>
-  </select>
-</p>
-<div id="as-single-wrap">
-  <p>
-    <label for="as-layout">版式</label>
-    <select id="as-layout" class="w-100">
-      <option value="auto">智能默认（横图横幅 / 竖图左图右文）</option>
-      <option value="banner">横幅</option>
-      <option value="overlay">叠字封面</option>
-      <option value="split-left">左图右文</option>
-      <option value="split-right">左文右图</option>
-      <option value="float">文绕图</option>
-      <option value="custom">自定义组合</option>
-    </select>
-  </p>
-  <div id="as-custom-wrap" hidden>
-    <p class="ci-inline-fields">
+<div class="as-workbench">
+  <div class="as-toolbar">
+    <p class="as-toolbar-row">
       <span>
-        <label for="as-pos">图位置</label>
-        <select id="as-pos" class="w-100">
-          <option value="top">上</option>
-          <option value="left">左</option>
-          <option value="right">右</option>
-          <option value="bg">作底</option>
+        <label for="as-cat">分类</label>
+        <select id="as-cat" class="w-100">
+          <option value="single">单图 · 与标题排版</option>
+          <option value="duo">双图</option>
+          <option value="multi">多图</option>
+          <option value="canvas">自由画布</option>
         </select>
       </span>
-      <span>
-        <label for="as-titlepos">标题位置</label>
-        <select id="as-titlepos" class="w-100">
-          <option value="above">图上（标题在图上方）</option>
-          <option value="on">叠在图上</option>
-          <option value="beside">图旁</option>
-          <option value="below">图下</option>
+      <span id="as-layout-field">
+        <label for="as-layout">版式</label>
+        <select id="as-layout" class="w-100">
+          <option value="auto">智能默认</option>
+          <option value="banner">横幅</option>
+          <option value="overlay">叠字封面</option>
+          <option value="split-left">左图右文</option>
+          <option value="split-right">左文右图</option>
+          <option value="float">文绕图</option>
+          <option value="custom">自定义</option>
+        </select>
+      </span>
+      <span id="as-preset-field" hidden>
+        <label for="as-preset">构图</label>
+        <select id="as-preset" class="w-100">
+          <option value="duo-split">左右对开</option>
+          <option value="duo-main-side">主图 + 侧图</option>
+          <option value="duo-overlap">轻微叠压</option>
+          <option value="tri-stack">一大两小</option>
+          <option value="tri-row">三联横排</option>
+          <option value="quad">四宫错落</option>
+          <option value="canvas">自由坐标</option>
+        </select>
+      </span>
+      <span id="as-ratio-field" hidden>
+        <label for="as-ratio">画幅</label>
+        <select id="as-ratio" class="w-100">
+          <option value="3:2">3:2</option>
+          <option value="16:9">16:9</option>
+          <option value="4:3">4:3</option>
+          <option value="1:1">1:1</option>
         </select>
       </span>
     </p>
-    <p class="ci-check">
-      <label><input type="checkbox" id="as-wrap"> 正文环绕图片</label>
+    <div id="as-custom-wrap" hidden>
+      <p class="ci-inline-fields">
+        <span>
+          <label for="as-pos">图位置</label>
+          <select id="as-pos" class="w-100">
+            <option value="top">上</option>
+            <option value="left">左</option>
+            <option value="right">右</option>
+            <option value="bg">作底</option>
+          </select>
+        </span>
+        <span>
+          <label for="as-titlepos">标题位置</label>
+          <select id="as-titlepos" class="w-100">
+            <option value="above">图上</option>
+            <option value="on">叠在图上</option>
+            <option value="beside">图旁</option>
+            <option value="below">图下</option>
+          </select>
+        </span>
+      </p>
+      <p class="ci-check">
+        <label><input type="checkbox" id="as-wrap"> 正文环绕图片</label>
+      </p>
+    </div>
+    <p id="as-alt-wrap">
+      <label for="as-alt">说明 / alt</label>
+      <input type="text" id="as-alt" class="text w-100" placeholder="可选">
     </p>
+    <p class="as-toolbar-actions">
+      <button type="button" class="btn btn-xs" id="as-lib-refresh">刷新附件库</button>
+      <button type="button" class="btn btn-xs" id="as-board-clear" hidden>清空画布</button>
+      <input type="hidden" id="as-src" value="">
+    </p>
+    <p class="description as-drop-hint">从下方图库<strong>拖到左侧预览</strong>，或点击选用。单图替换主图；多图/画布则加入画布。</p>
   </div>
-  <p>
-    <label for="as-src">图片 URL <span class="ci-req">*</span></label>
-    <input type="text" id="as-src" class="text w-100 mono" placeholder="https://... 或从附件选择">
-    <select id="as-src-pick" class="w-100"><option value="">— 从已上传附件选择图片 —</option></select>
-    <span id="as-src-thumb" class="as-src-thumb" hidden><img alt="预览"></span>
-  </p>
-  <p>
-    <label for="as-alt">说明 / alt</label>
-    <input type="text" id="as-alt" class="text w-100" placeholder="可选">
-  </p>
+  <div class="as-lib">
+    <div class="as-lib-head">
+      <span>附件图片库</span>
+      <span id="as-lib-count" class="as-lib-count">0</span>
+    </div>
+    <div id="as-lib-grid" class="as-lib-grid"></div>
+    <p id="as-lib-empty" class="as-lib-empty" hidden>暂无图片附件。请先在文章右侧「附件」上传图片，再点「刷新附件库」。</p>
+  </div>
 </div>
-<div id="as-board-wrap" hidden>
-  <p>
-    <label for="as-preset">构图</label>
-    <select id="as-preset" class="w-100">
-      <option value="duo-split">左右对开</option>
-      <option value="duo-main-side">主图 + 侧图</option>
-      <option value="duo-overlap">轻微叠压</option>
-      <option value="tri-stack">一大两小</option>
-      <option value="tri-row">三联横排</option>
-      <option value="quad">四宫错落</option>
-      <option value="canvas">自由（保持当前坐标）</option>
-    </select>
-  </p>
-  <p class="ci-inline-fields">
-    <span>
-      <label for="as-ratio">画幅</label>
-      <select id="as-ratio" class="w-100">
-        <option value="3:2">3:2 页</option>
-        <option value="16:9">16:9 宽</option>
-        <option value="4:3">4:3</option>
-        <option value="1:1">1:1</option>
-      </select>
-    </span>
-  </p>
-  <p>
-    <label>添加图片</label>
-    <select id="as-board-pick" class="w-100"><option value="">— 从附件加入画布 —</option></select>
-    <input type="text" id="as-board-url" class="text w-100 mono" placeholder="或粘贴图片 URL 后回车">
-  </p>
-  <p class="description">左侧画布可拖拽图片；右下角圆点缩放。位置按百分比保存，窄屏整页等比缩放，图片保持原比例、不拉伸。</p>
-  <p><button type="button" class="btn btn-xs" id="as-board-clear">清空画布</button></p>
-</div>
-<p class="description">插入到该章 <code>## 标题</code> 下一行。</p>
 HTML;
 
         ComponentInserter_Registry::register(array(
@@ -156,15 +238,16 @@ HTML;
             'label' => '图文融合',
             'order' => 15,
             'panelHtml' => $panelHtml,
-            'boot' => array(),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.2.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.2.0'),
+            'boot' => array(
+                'images' => self::listImageAttachments(),
+            ),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.3.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.3.0'),
         ));
     }
 
     /**
      * Markdown 转换前先把短代码变成 HTML，避免 [board][img] 被当成引用链接。
-     * 接管 markdown 钩子后需自行调用 Utils\Markdown::convert。
      */
     public static function markdown($text, $lastResult = null)
     {
@@ -380,7 +463,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $href = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.1.0';
-        echo '<link rel="stylesheet" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '">';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.3.0';
+        echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }

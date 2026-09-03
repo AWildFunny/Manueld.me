@@ -34,7 +34,7 @@ class Daydream_ComponentInserter
         $items = ComponentInserter_Registry::all();
         $themeUrl = rtrim(Helper::options()->themeUrl, '/');
         $assetBase = $themeUrl . '/assets/admin/component-inserter';
-        $css = htmlspecialchars($assetBase . '/admin-shell.css?ver=1.2.0', ENT_QUOTES, 'UTF-8');
+        $css = htmlspecialchars($assetBase . '/admin-shell.css?ver=1.2.1', ENT_QUOTES, 'UTF-8');
         $js = htmlspecialchars($assetBase . '/admin-shell.js?ver=1.2.0', ENT_QUOTES, 'UTF-8');
 
         $componentsBoot = array();
