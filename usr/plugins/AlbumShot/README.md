@@ -28,12 +28,16 @@
 [album-shot layout="overlay" src="/usr/uploads/a.jpg" alt="现场"]
 ```
 
-多图 / 画布：
+多图 / 画布（插入的是与前台相同的 HTML，避免 Markdown 拆图）：
 
 ```
-<div>
-[album-board ratio="3:2"][img src="https://..." x="2" y="6" w="47" h="88" ox="50" oy="40"][img src="https://..." x="51" y="6" w="47" h="88"][/album-board]
-</div>
+<div class="album-board" data-ratio="3:2">...</div>
+```
+
+旧短代码仍可用：
+
+```
+[album-board ratio="3:2"][img src="https://..." x="2" y="6" w="47" h="88" ox="50" oy="40"][/album-board]
 ```
 
 `x` `y` `w` `h` 为相对画幅的百分比。带 `h` 时图片在画框内 `cover` 裁剪，可用 `ox` `oy`（0–100）与 `zoom`（1–3）控制取景。无 `h` 的旧短代码仍按原比例显示。

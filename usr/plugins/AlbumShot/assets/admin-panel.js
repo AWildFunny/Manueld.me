@@ -418,7 +418,29 @@
     }
 
     function wrapForMarkdown(code) {
-        return '<div>\n' + code + '\n</div>';
+        return '\n\n' + code + '\n\n';
+    }
+
+    function buildBoardHtml() {
+        var ratio = $('#as-ratio').val() || '3:2';
+        var ratioCss = ratio.replace(':', ' / ');
+        var html = '<div class="album-board" data-ratio="' + escapeHtml(ratio) + '">'
+            + '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' + escapeHtml(ratioCss)
+            + ';overflow:hidden;--board-ratio:' + escapeHtml(ratioCss) + '">';
+        items.forEach(function (it) {
+            ensureCrop(it);
+            var box = 'position:absolute;left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
+                + 'overflow:hidden;margin:0;padding:0;--ox:' + it.ox + '%;--oy:' + it.oy + '%;--zoom:' + it.zoom + ';';
+            var imgStyle = 'width:100%;height:100%;max-height:none;object-fit:cover;object-position:' + it.ox + '% ' + it.oy + '%;'
+                + 'transform:scale(' + it.zoom + ');transform-origin:' + it.ox + '% ' + it.oy + '%;display:block;';
+            html += '<figure class="album-board-item is-crop" style="' + box + '">'
+                + '<a data-fancybox="gallery" href="' + escapeHtml(it.src) + '" data-caption="' + escapeHtml(it.alt || '')
+                + '" style="display:block;width:100%;height:100%;line-height:0">'
+                + '<img src="' + escapeHtml(it.src) + '" alt="' + escapeHtml(it.alt || '') + '" style="' + imgStyle + '">'
+                + '</a></figure>';
+        });
+        html += '</div></div>';
+        return html;
     }
 
     function buildShortcode() {
@@ -447,20 +469,8 @@
             window.alert('请至少加入一张图片');
             return '';
         }
-        var ratio = $('#as-ratio').val() || '3:2';
-        var inner = items.map(function (it) {
-            ensureCrop(it);
-            var parts = '[img src="' + escapeAttr(it.src) + '" x="' + it.x + '" y="' + it.y + '" w="' + it.w + '" h="' + it.h + '"'
-                + ' ox="' + it.ox + '" oy="' + it.oy + '"';
-            if (it.zoom && it.zoom !== 1) {
-                parts += ' zoom="' + it.zoom + '"';
-            }
-            if (it.alt) {
-                parts += ' alt="' + escapeAttr(it.alt) + '"';
-            }
-            return parts + ']';
-        }).join('');
-        return wrapForMarkdown('[album-board ratio="' + escapeAttr(ratio) + '"]' + inner + '[/album-board]');
+        // 直接插入与前台一致的 HTML，避免 [img][img] 被 HyperDown 当成引用链接拆成上下叠图
+        return wrapForMarkdown(buildBoardHtml());
     }
 
     function pctFromEvent(e, $board) {

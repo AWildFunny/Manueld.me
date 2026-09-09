@@ -454,8 +454,12 @@
             if (!stage) {
                 return;
             }
+            // 裁剪画框依赖 stage 的 aspect-ratio；清空后高度塌缩，图会按文档流上下堆叠
+            if (stage.querySelector('.album-board-item.is-crop') || stage.style.aspectRatio || stage.style.getPropertyValue('--board-ratio')) {
+                board.style.paddingBottom = '';
+                return;
+            }
             stage.style.height = '';
-            stage.style.aspectRatio = '';
             var boxH = stage.clientHeight;
             var extra = 0;
             Array.prototype.forEach.call(stage.querySelectorAll('.album-board-item'), function (item) {

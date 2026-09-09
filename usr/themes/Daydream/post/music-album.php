@@ -8,7 +8,7 @@
 $this->need('header.php');
 ?>
 
-<link rel="stylesheet" href="<?php $this->options->themeUrl('/assets/css/music-album.css'); ?>?ver=2.3.6">
+<link rel="stylesheet" href="<?php $this->options->themeUrl('/assets/css/music-album.css'); ?>?ver=2.3.7">
 
 <?php if ($this->fields->linkTo): ?>
     <script type="text/javascript">window.location.href = '<?php echo $this->fields->linkTo; ?>';</script>
@@ -83,6 +83,6 @@ $this->need('header.php');
 
 <?php $this->need('comments.php'); ?>
 
-<script src="<?php $this->options->themeUrl('/assets/js/music-album.js'); ?>?ver=2.3.4" defer></script>
+<script src="<?php $this->options->themeUrl('/assets/js/music-album.js'); ?>?ver=2.3.5" defer></script>
 
 <?php $this->need('footer.php'); ?>

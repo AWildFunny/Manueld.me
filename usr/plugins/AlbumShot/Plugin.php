@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.4.0
+ * @version 1.5.0
  * @dependence 9.9.2-*
  */
 
@@ -241,8 +241,8 @@ HTML;
             'boot' => array(
                 'images' => self::listImageAttachments(),
             ),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.4.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.4.0'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.5.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.5.0'),
         ));
     }
 
@@ -251,15 +251,19 @@ HTML;
      */
     public static function markdown($text, $lastResult = null)
     {
-        $text = ($lastResult === null || $lastResult === '') ? $text : $lastResult;
-        $text = self::parse($text, null, null);
+        // 始终优先从原文解析短代码：其它 markdown 钩子若先跑，lastResult 里 [img] 可能已被当成引用链接吃掉
+        $source = $text;
+        if (stripos($source, '[album-board') === false && stripos($source, '[album-shot') === false) {
+            $source = ($lastResult === null || $lastResult === '') ? $text : $lastResult;
+        }
+        $html = self::parse($source, null, null);
         if (class_exists('\\Utils\\Markdown')) {
-            return \Utils\Markdown::convert($text);
+            return \Utils\Markdown::convert($html);
         }
         if (class_exists('Markdown')) {
-            return Markdown::convert($text);
+            return Markdown::convert($html);
         }
-        return $text;
+        return $html;
     }
 
     public static function parse($content, $widget, $lastResult)
@@ -323,26 +327,48 @@ HTML;
                 );
             }
         }
+        // 短代码若已被 Markdown 拆成 <img>，仍尽量收回画布
+        if (empty($items) && preg_match_all('/<img\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\'][^>]*>/i', $inner, $hm, PREG_SET_ORDER)) {
+            $n = count($hm);
+            foreach ($hm as $i => $row) {
+                $src = trim($row[1]);
+                if (!self::isSafeUrl($src)) {
+                    continue;
+                }
+                $items[] = array(
+                    'src' => $src,
+                    'alt' => '',
+                    'x' => $n <= 1 ? 4 : ($i % 2 === 0 ? 2 : 51),
+                    'y' => $n <= 2 ? 6 : (4 + (int) floor($i / 2) * 48),
+                    'w' => $n <= 1 ? 92 : 47,
+                    'h' => $n <= 2 ? 88 : 44,
+                    'ox' => 50,
+                    'oy' => 50,
+                    'zoom' => 1,
+                );
+            }
+        }
         if (empty($items)) {
             return '';
         }
 
         $ratioCss = htmlspecialchars($rw . ' / ' . $rh, ENT_QUOTES, 'UTF-8');
         $html = '<div class="album-board" data-ratio="' . htmlspecialchars($ratio, ENT_QUOTES, 'UTF-8') . '">';
-        $html .= '<div class="album-board-stage" style="--board-ratio:' . $ratioCss . '">';
+        $html .= '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' . $ratioCss . ';overflow:hidden;--board-ratio:' . $ratioCss . '">';
         foreach ($items as $item) {
+            $h = !empty($item['h']) ? $item['h'] : 55;
             $srcEsc = htmlspecialchars($item['src'], ENT_QUOTES, 'UTF-8');
             $altEsc = htmlspecialchars($item['alt'], ENT_QUOTES, 'UTF-8');
-            $style = 'left:' . $item['x'] . '%;top:' . $item['y'] . '%;width:' . $item['w'] . '%;';
-            $cls = 'album-board-item';
-            if (!empty($item['h'])) {
-                $cls .= ' is-crop';
-                $style .= 'height:' . $item['h'] . '%;';
-                $style .= '--ox:' . $item['ox'] . '%;--oy:' . $item['oy'] . '%;--zoom:' . $item['zoom'] . ';';
-            }
-            $html .= '<figure class="' . $cls . '" style="' . $style . '">';
-            $html .= '<a data-fancybox="gallery" href="' . $srcEsc . '" data-caption="' . $altEsc . '">';
-            $html .= '<img src="' . $srcEsc . '" alt="' . $altEsc . '">';
+            $ox = isset($item['ox']) ? $item['ox'] : 50;
+            $oy = isset($item['oy']) ? $item['oy'] : 50;
+            $zoom = isset($item['zoom']) ? $item['zoom'] : 1;
+            $box = 'position:absolute;left:' . $item['x'] . '%;top:' . $item['y'] . '%;width:' . $item['w'] . '%;height:' . $h . '%;'
+                . 'overflow:hidden;margin:0;padding:0;--ox:' . $ox . '%;--oy:' . $oy . '%;--zoom:' . $zoom . ';';
+            $imgStyle = 'width:100%;height:100%;max-height:none;object-fit:cover;object-position:' . $ox . '% ' . $oy . '%;'
+                . 'transform:scale(' . $zoom . ');transform-origin:' . $ox . '% ' . $oy . '%;display:block;';
+            $html .= '<figure class="album-board-item is-crop" style="' . $box . '">';
+            $html .= '<a data-fancybox="gallery" href="' . $srcEsc . '" data-caption="' . $altEsc . '" style="display:block;width:100%;height:100%;line-height:0">';
+            $html .= '<img src="' . $srcEsc . '" alt="' . $altEsc . '" style="' . $imgStyle . '">';
             $html .= '</a></figure>';
         }
         $html .= '</div></div>';
@@ -489,7 +515,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.4.0';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.5.0';
         echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }
