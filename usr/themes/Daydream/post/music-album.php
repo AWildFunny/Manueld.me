@@ -8,7 +8,7 @@
 $this->need('header.php');
 ?>
 
-<link rel="stylesheet" href="<?php $this->options->themeUrl('/assets/css/music-album.css'); ?>?ver=2.3.5">
+<link rel="stylesheet" href="<?php $this->options->themeUrl('/assets/css/music-album.css'); ?>?ver=2.3.6">
 
 <?php if ($this->fields->linkTo): ?>
     <script type="text/javascript">window.location.href = '<?php echo $this->fields->linkTo; ?>';</script>

@@ -176,43 +176,61 @@
     function presetSlots(kind) {
         if (kind === 'duo-split') {
             return [
-                { x: 2, y: 6, w: 47 },
-                { x: 51, y: 6, w: 47 }
+                { x: 2, y: 6, w: 47, h: 88 },
+                { x: 51, y: 6, w: 47, h: 88 }
             ];
         }
         if (kind === 'duo-main-side') {
             return [
-                { x: 2, y: 5, w: 60 },
-                { x: 64, y: 22, w: 34 }
+                { x: 2, y: 5, w: 60, h: 90 },
+                { x: 64, y: 22, w: 34, h: 56 }
             ];
         }
         if (kind === 'duo-overlap') {
             return [
-                { x: 5, y: 8, w: 58 },
-                { x: 40, y: 24, w: 52 }
+                { x: 5, y: 8, w: 58, h: 84 },
+                { x: 40, y: 24, w: 52, h: 70 }
             ];
         }
         if (kind === 'tri-stack') {
             return [
-                { x: 2, y: 4, w: 58 },
-                { x: 62, y: 4, w: 36 },
-                { x: 62, y: 50, w: 36 }
+                { x: 2, y: 4, w: 58, h: 92 },
+                { x: 62, y: 4, w: 36, h: 44 },
+                { x: 62, y: 52, w: 36, h: 44 }
             ];
         }
         if (kind === 'tri-row') {
             return [0, 1, 2].map(function (i) {
-                return { x: 2 + i * 32.5, y: 10, w: 31 };
+                return { x: 2 + i * 32.5, y: 10, w: 31, h: 80 };
             });
         }
         if (kind === 'quad') {
             return [
-                { x: 2, y: 4, w: 47 },
-                { x: 51, y: 4, w: 47 },
-                { x: 2, y: 50, w: 47 },
-                { x: 51, y: 50, w: 47 }
+                { x: 2, y: 4, w: 47, h: 44 },
+                { x: 51, y: 4, w: 47, h: 44 },
+                { x: 2, y: 52, w: 47, h: 44 },
+                { x: 51, y: 52, w: 47, h: 44 }
             ];
         }
         return [];
+    }
+
+    function ensureCrop(it) {
+        if (!it) {
+            return;
+        }
+        if (it.ox == null || isNaN(it.ox)) {
+            it.ox = 50;
+        }
+        if (it.oy == null || isNaN(it.oy)) {
+            it.oy = 50;
+        }
+        if (it.zoom == null || isNaN(it.zoom)) {
+            it.zoom = 1;
+        }
+        if (!it.h) {
+            it.h = 50;
+        }
     }
 
     function applyPreset(kind) {
@@ -224,15 +242,17 @@
             return;
         }
         items.forEach(function (it, i) {
+            ensureCrop(it);
             if (i < slots.length) {
                 it.x = slots[i].x;
                 it.y = slots[i].y;
                 it.w = slots[i].w;
+                it.h = slots[i].h;
             } else {
-                // 超出构图槽位：错开叠放，保留用户已加的图
                 it.x = clamp(6 + ((i - slots.length) % 3) * 8, 0, 88);
                 it.y = clamp(8 + ((i - slots.length) % 4) * 10, 0, 88);
                 it.w = 36;
+                it.h = 36;
             }
         });
         if (selected >= items.length) {
@@ -259,10 +279,35 @@
         return ($('#as-ratio').val() || '3:2').replace(':', ' / ');
     }
 
+    function applyBoardRatio() {
+        var el = document.getElementById('as-board');
+        if (!el) {
+            return;
+        }
+        var r = ratioCss();
+        el.style.setProperty('--board-ratio', r);
+        el.style.aspectRatio = r;
+    }
+
+    function itemStyle(it) {
+        ensureCrop(it);
+        return 'left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
+            + '--ox:' + it.ox + '%;--oy:' + it.oy + '%;--zoom:' + it.zoom + ';';
+    }
+
+    function syncBoardFrame(i) {
+        var it = items[i];
+        var el = document.querySelector('.as-board-item[data-i="' + i + '"]');
+        if (!it || !el) {
+            return;
+        }
+        el.setAttribute('style', itemStyle(it));
+    }
+
     function boardEditorHtml() {
         return '<div class="as-board-ui as-drop-stage" data-as-drop="1">'
-            + '<p class="as-board-hint">从右侧拖图到此 · 画布内拖动排版 · 角标删除 · 右下角缩放</p>'
-            + '<div id="as-board" class="as-board" style="--board-ratio:' + ratioCss() + '"></div>'
+            + '<p class="as-board-hint">框内拖动裁剪 · 左下角移动画框 · 右下角缩放 · 滚轮变焦</p>'
+            + '<div id="as-board" class="as-board" style="--board-ratio:' + ratioCss() + ';aspect-ratio:' + ratioCss() + '"></div>'
             + '</div>';
     }
 
@@ -271,17 +316,19 @@
         if (!$board.length) {
             return;
         }
-        $board.css('--board-ratio', ratioCss());
+        applyBoardRatio();
         if (!items.length) {
             $board.html('<div class="as-board-empty">将右侧图片拖到此处，或点击选用</div>');
             return;
         }
         var html = '';
         items.forEach(function (it, i) {
-            html += '<figure class="as-board-item' + (i === selected ? ' is-on' : '') + '" data-i="' + i + '" style="left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%">'
+            ensureCrop(it);
+            html += '<figure class="as-board-item is-crop' + (i === selected ? ' is-on' : '') + '" data-i="' + i + '" style="' + itemStyle(it) + '">'
                 + '<button type="button" class="as-board-remove" data-remove="' + i + '" title="从画布移除" aria-label="移除">×</button>'
-                + '<img src="' + escapeHtml(it.src) + '" alt="">'
-                + '<i class="as-board-handle" data-resize="' + i + '"></i>'
+                + '<i class="as-board-move" data-move="' + i + '" title="移动画框"></i>'
+                + '<div class="as-board-crop" data-crop="' + i + '"><img src="' + escapeHtml(it.src) + '" alt="" draggable="false"></div>'
+                + '<i class="as-board-handle" data-resize="' + i + '" title="缩放画框"></i>'
                 + '</figure>';
         });
         $board.html(html);
@@ -297,6 +344,10 @@
             x: 6 + (n % 3) * 8,
             y: 8 + (n % 4) * 10,
             w: n ? 36 : 48,
+            h: n ? 40 : 55,
+            ox: 50,
+            oy: 50,
+            zoom: 1,
             alt: ''
         });
         selected = items.length - 1;
@@ -398,8 +449,16 @@
         }
         var ratio = $('#as-ratio').val() || '3:2';
         var inner = items.map(function (it) {
-            return '[img src="' + escapeAttr(it.src) + '" x="' + it.x + '" y="' + it.y + '" w="' + it.w + '"'
-                + (it.alt ? ' alt="' + escapeAttr(it.alt) + '"' : '') + ']';
+            ensureCrop(it);
+            var parts = '[img src="' + escapeAttr(it.src) + '" x="' + it.x + '" y="' + it.y + '" w="' + it.w + '" h="' + it.h + '"'
+                + ' ox="' + it.ox + '" oy="' + it.oy + '"';
+            if (it.zoom && it.zoom !== 1) {
+                parts += ' zoom="' + it.zoom + '"';
+            }
+            if (it.alt) {
+                parts += ' alt="' + escapeAttr(it.alt) + '"';
+            }
+            return parts + ']';
         }).join('');
         return wrapForMarkdown('[album-board ratio="' + escapeAttr(ratio) + '"]' + inner + '[/album-board]');
     }
@@ -441,6 +500,7 @@
                     }, 0);
                     return boardEditorHtml();
                 }
+                applyBoardRatio();
                 paintBoard();
                 return false;
             }
@@ -458,28 +518,29 @@
     $(function () {
         mergeLibrary();
 
-        $(document).on('change', '#as-cat', function () {
-            syncUi();
-            if (isBoardMode() && items.length && cat() !== 'canvas') {
-                applyPreset($('#as-preset').val());
+        $(document).on('change', '#as-cat, #as-preset, #as-ratio, #as-layout, #as-pos, #as-titlepos, #as-wrap, #as-alt', function () {
+            var id = this.id;
+            if (id === 'as-cat') {
+                syncUi();
+                if (isBoardMode() && items.length && cat() !== 'canvas') {
+                    applyPreset($('#as-preset').val());
+                }
+            } else if (id === 'as-preset') {
+                applyPreset($(this).val());
+            } else if (id === 'as-layout' || id === 'as-pos' || id === 'as-titlepos' || id === 'as-wrap') {
+                syncUi();
             }
-            if (window.CI_refreshPreview) window.CI_refreshPreview();
+            if (window.CI_refreshPreview) {
+                window.CI_refreshPreview();
+            } else if (isBoardMode()) {
+                applyBoardRatio();
+                paintBoard();
+            }
             window.setTimeout(function () {
+                applyBoardRatio();
                 paintBoard();
                 renderLibrary();
             }, 0);
-        });
-
-        $(document).on('change', '#as-layout, #as-pos, #as-titlepos, #as-wrap, #as-alt', function () {
-            syncUi();
-            if (window.CI_refreshPreview) window.CI_refreshPreview();
-        });
-
-        $(document).on('change', '#as-preset', function () {
-            applyPreset($(this).val());
-            paintBoard();
-            renderLibrary();
-            if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
 
         $(document).on('click', '.as-board-remove', function (e) {
@@ -503,12 +564,6 @@
                 e.preventDefault();
                 removeItem(selected);
             }
-        });
-
-        $(document).on('change', '#as-ratio', function () {
-            paintBoard();
-            $('#as-board').css('--board-ratio', ratioCss());
-            if (window.CI_refreshPreview) window.CI_refreshPreview();
         });
 
         $(document).on('click', '#as-lib-refresh', function (e) {
@@ -576,50 +631,137 @@
         });
 
         $(document).on('mousedown', '.as-board-item', function (e) {
-            if ($(e.target).closest('.as-board-handle, .as-board-remove').length) return;
+            if ($(e.target).closest('.as-board-handle, .as-board-remove, .as-board-move').length) {
+                return;
+            }
             var i = parseInt($(this).data('i'), 10);
+            if (!items[i]) {
+                return;
+            }
             selected = i;
-            var $board = $('#as-board');
-            var start = pctFromEvent(e, $board);
+            ensureCrop(items[i]);
+            $('.as-board-item').removeClass('is-on');
+            $(this).addClass('is-on');
+            var rect = this.getBoundingClientRect();
+            var mode = (e.altKey || e.shiftKey) ? 'move' : 'crop';
+            if (mode === 'move') {
+                var start = pctFromEvent(e, $('#as-board'));
+                drag = {
+                    mode: 'move',
+                    i: i,
+                    ox: start.x - items[i].x,
+                    oy: start.y - items[i].y
+                };
+            } else {
+                drag = {
+                    mode: 'crop',
+                    i: i,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startOx: items[i].ox,
+                    startOy: items[i].oy,
+                    elW: Math.max(rect.width, 1),
+                    elH: Math.max(rect.height, 1)
+                };
+            }
+            e.preventDefault();
+        });
+
+        $(document).on('mousedown', '.as-board-move', function (e) {
+            var i = parseInt($(this).attr('data-move'), 10);
+            if (!items[i]) {
+                return;
+            }
+            selected = i;
+            $('.as-board-item').removeClass('is-on');
+            $(this).closest('.as-board-item').addClass('is-on');
+            var start = pctFromEvent(e, $('#as-board'));
             drag = {
                 mode: 'move',
                 i: i,
                 ox: start.x - items[i].x,
                 oy: start.y - items[i].y
             };
-            paintBoard();
             e.preventDefault();
+            e.stopPropagation();
         });
 
         $(document).on('mousedown', '.as-board-handle', function (e) {
             var i = parseInt($(this).data('resize'), 10);
+            if (!items[i]) {
+                return;
+            }
             selected = i;
-            drag = { mode: 'resize', i: i, startW: items[i].w, startX: e.clientX };
+            ensureCrop(items[i]);
+            drag = {
+                mode: 'resize',
+                i: i,
+                startW: items[i].w,
+                startH: items[i].h,
+                startX: e.clientX,
+                startY: e.clientY
+            };
             e.preventDefault();
             e.stopPropagation();
         });
 
         $(document).on('mousemove', function (e) {
-            if (!drag || !items[drag.i]) return;
+            if (!drag || !items[drag.i]) {
+                return;
+            }
             var it = items[drag.i];
+            var $board = $('#as-board');
+            if (!$board.length) {
+                return;
+            }
             if (drag.mode === 'move') {
-                var p = pctFromEvent(e, $('#as-board'));
+                var p = pctFromEvent(e, $board);
                 it.x = clamp(Math.round(p.x - drag.ox), 0, 88);
                 it.y = clamp(Math.round(p.y - drag.oy), 0, 88);
+            } else if (drag.mode === 'crop') {
+                var dx = e.clientX - drag.startX;
+                var dy = e.clientY - drag.startY;
+                var factor = 100 / Math.max(it.zoom || 1, 1);
+                it.ox = clamp(Math.round(drag.startOx - (dx / drag.elW) * factor), 0, 100);
+                it.oy = clamp(Math.round(drag.startOy - (dy / drag.elH) * factor), 0, 100);
             } else {
-                var dw = (e.clientX - drag.startX) / Math.max($('#as-board').width(), 1) * 100;
+                var bw = Math.max($board.width(), 1);
+                var bh = Math.max($board.height(), 1);
+                var dw = (e.clientX - drag.startX) / bw * 100;
+                var dh = (e.clientY - drag.startY) / bh * 100;
                 it.w = clamp(Math.round(drag.startW + dw), 12, 96);
+                it.h = clamp(Math.round(drag.startH + dh), 12, 96);
             }
-            $('.as-board-item[data-i="' + drag.i + '"]').css({
-                left: it.x + '%',
-                top: it.y + '%',
-                width: it.w + '%'
-            });
+            syncBoardFrame(drag.i);
         });
 
         $(document).on('mouseup', function () {
             drag = null;
         });
+
+        if (document.addEventListener) {
+            document.addEventListener('wheel', function (e) {
+                var item = e.target && e.target.closest ? e.target.closest('.as-board-item') : null;
+                if (!item || !document.getElementById('as-board')) {
+                    return;
+                }
+                if ($('#ci-inserter-modal').prop('hidden') || $('#ci-panel-album-shot').prop('hidden')) {
+                    return;
+                }
+                var i = parseInt(item.getAttribute('data-i'), 10);
+                if (!items[i]) {
+                    return;
+                }
+                e.preventDefault();
+                selected = i;
+                ensureCrop(items[i]);
+                var delta = e.deltaY > 0 ? -0.08 : 0.08;
+                items[i].zoom = Math.round(clamp(items[i].zoom + delta, 1, 3) * 100) / 100;
+                $('.as-board-item').removeClass('is-on');
+                $(item).addClass('is-on');
+                syncBoardFrame(i);
+            }, { passive: false });
+        }
 
         // 上传完成后自动刷新图库
         if (window.MutationObserver && document.body) {

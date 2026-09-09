@@ -560,6 +560,25 @@ article.music-album-article nav.music-album-nav {
     border-radius: 2px;
 }
 
+.album-board-item.is-crop {
+    overflow: hidden;
+}
+
+.album-board-item.is-crop a {
+    width: 100%;
+    height: 100%;
+}
+
+.album-board-item.is-crop img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--ox, 50%) var(--oy, 50%);
+    transform: scale(var(--zoom, 1));
+    transform-origin: var(--ox, 50%) var(--oy, 50%);
+    border-radius: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .music-album-nav,
     .music-album-nav-now,

@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.3.1
+ * @version 1.4.0
  * @dependence 9.9.2-*
  */
 
@@ -241,8 +241,8 @@ HTML;
             'boot' => array(
                 'images' => self::listImageAttachments(),
             ),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.3.1'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.3.1'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.4.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.4.0'),
         ));
     }
 
@@ -309,12 +309,17 @@ HTML;
                 if (!self::isSafeUrl($src)) {
                     continue;
                 }
+                $hRaw = isset($ia['h']) ? trim($ia['h']) : '';
                 $items[] = array(
                     'src' => $src,
                     'alt' => isset($ia['alt']) ? trim($ia['alt']) : '',
                     'x' => self::num($ia, 'x', 4),
                     'y' => self::num($ia, 'y', 4),
                     'w' => self::num($ia, 'w', 44),
+                    'h' => $hRaw === '' ? 0 : self::num($ia, 'h', 0),
+                    'ox' => self::num($ia, 'ox', 50),
+                    'oy' => self::num($ia, 'oy', 50),
+                    'zoom' => self::zoom($ia),
                 );
             }
         }
@@ -329,7 +334,13 @@ HTML;
             $srcEsc = htmlspecialchars($item['src'], ENT_QUOTES, 'UTF-8');
             $altEsc = htmlspecialchars($item['alt'], ENT_QUOTES, 'UTF-8');
             $style = 'left:' . $item['x'] . '%;top:' . $item['y'] . '%;width:' . $item['w'] . '%;';
-            $html .= '<figure class="album-board-item" style="' . $style . '">';
+            $cls = 'album-board-item';
+            if (!empty($item['h'])) {
+                $cls .= ' is-crop';
+                $style .= 'height:' . $item['h'] . '%;';
+                $style .= '--ox:' . $item['ox'] . '%;--oy:' . $item['oy'] . '%;--zoom:' . $item['zoom'] . ';';
+            }
+            $html .= '<figure class="' . $cls . '" style="' . $style . '">';
             $html .= '<a data-fancybox="gallery" href="' . $srcEsc . '" data-caption="' . $altEsc . '">';
             $html .= '<img src="' . $srcEsc . '" alt="' . $altEsc . '">';
             $html .= '</a></figure>';
@@ -349,6 +360,21 @@ HTML;
         }
         if ($v > 100) {
             $v = 100;
+        }
+        return round($v, 2);
+    }
+
+    private static function zoom($attrs)
+    {
+        if (!isset($attrs['zoom']) || $attrs['zoom'] === '') {
+            return 1;
+        }
+        $v = floatval($attrs['zoom']);
+        if ($v < 1) {
+            $v = 1;
+        }
+        if ($v > 3) {
+            $v = 3;
         }
         return round($v, 2);
     }
@@ -463,7 +489,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.3.1';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.4.0';
         echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }

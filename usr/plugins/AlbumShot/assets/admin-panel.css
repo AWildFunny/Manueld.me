@@ -297,7 +297,6 @@
         linear-gradient(90deg, #e8edf1 1px, transparent 1px) 0 0 / 10% 10%,
         #f7f8fa;
     border: 1px dashed #c5d0d8;
-    min-height: 180px;
     overflow: hidden;
 }
 
@@ -316,7 +315,8 @@
 .as-board-item {
     position: absolute;
     margin: 0;
-    cursor: move;
+    overflow: hidden;
+    background: #d7dee5;
     box-shadow: 0 0 0 1px rgba(78, 114, 137, 0.25);
 }
 
@@ -325,19 +325,75 @@
     z-index: 2;
 }
 
+.as-board-crop {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: grab;
+}
+
+.as-board-crop:active {
+    cursor: grabbing;
+}
+
 .as-board-item img {
     display: block;
     width: 100%;
-    height: auto;
-    object-fit: contain;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--ox, 50%) var(--oy, 50%);
+    transform: scale(var(--zoom, 1));
+    transform-origin: var(--ox, 50%) var(--oy, 50%);
     pointer-events: none;
+    user-select: none;
     background: #fff;
+}
+
+.as-board-move {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    z-index: 3;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(78, 114, 137, 0.92);
+    cursor: move;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.as-board-move::before,
+.as-board-move::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: #fff;
+}
+
+.as-board-move::before {
+    width: 10px;
+    height: 2px;
+    margin: -1px 0 0 -5px;
+}
+
+.as-board-move::after {
+    width: 2px;
+    height: 10px;
+    margin: -5px 0 0 -1px;
+}
+
+.as-board-item:hover .as-board-move,
+.as-board-item.is-on .as-board-move {
+    opacity: 1;
 }
 
 .as-board-handle {
     position: absolute;
     right: -5px;
     bottom: -5px;
+    z-index: 3;
     width: 11px;
     height: 11px;
     border-radius: 50%;
