@@ -196,7 +196,26 @@ function musicAlbumReadShotAttrs($figureHtml) {
 }
 
 /**
- * 将章节内 album-shot 或首张图片提升为章头视觉，并包一层正文
+ * 章标题后可忽略的空白长度（空段落、换行、注释）。
+ * 只有紧挨这些前缀之后的媒体，才提升为章头视觉。
+ *
+ * @param string $html
+ * @return int
+ */
+function musicAlbumChapterLeadLength($html)
+{
+    if ($html === '' || $html === null) {
+        return 0;
+    }
+    if (preg_match('/^(?:\s|<(?:p)>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>|<!--[\s\S]*?-->)*/i', $html, $m)) {
+        return strlen($m[0]);
+    }
+    return 0;
+}
+
+/**
+ * 将章节内、紧跟标题的 album-shot / album-board / 首图提升为章头视觉，并包一层正文。
+ * 正文中间的图文画布不移动，避免插图被抽到章首。
  *
  * @param string $chapterHtml
  * @return array{0:string,1:bool,2:string,3:string,4:string,5:bool} html, hasMedia, layout, pos, titlepos, wrap
@@ -208,20 +227,27 @@ function musicAlbumEnhanceChapterMedia($chapterHtml) {
 
     $h2 = $h2Match[0];
     $rest = substr($chapterHtml, strlen($h2));
+    $lead = musicAlbumChapterLeadLength($rest);
     $figure = '';
     $layout = 'auto';
     $attrs = array();
 
-        if (preg_match('/(?:<p>\s*)?(<div\b[^>]*\balbum-board\b[\s\S]*?<\/div>\s*<\/div>)(?:\s*<\/p>)?/is', $rest, $boardMatch, PREG_OFFSET_CAPTURE)) {
-            $figure = $boardMatch[1][0];
-            $full = $boardMatch[0][0];
-            $offset = $boardMatch[0][1];
-            $rest = substr($rest, 0, $offset) . substr($rest, $offset + strlen($full));
-            $assembled = $h2 . "\n" . $figure . '<div class="music-album-chapter-body">' . $rest . '</div>';
-            return array($assembled, true, 'board', 'top', 'above', false);
-        }
+    $takeLeading = function ($match) use ($lead) {
+        return isset($match[0][1]) && $match[0][1] <= $lead;
+    };
 
-        if (preg_match('/(?:<p>\s*)?(<figure\b[^>]*\balbum-shot\b[^>]*>.*?<\/figure>)(?:\s*<\/p>)?/is', $rest, $shotMatch, PREG_OFFSET_CAPTURE)) {
+    if (preg_match('/(?:<p>\s*)?(<div\b[^>]*\balbum-board\b[\s\S]*?<\/div>\s*<\/div>)(?:\s*<\/p>)?/is', $rest, $boardMatch, PREG_OFFSET_CAPTURE)
+        && $takeLeading($boardMatch)) {
+        $figure = $boardMatch[1][0];
+        $full = $boardMatch[0][0];
+        $offset = $boardMatch[0][1];
+        $rest = substr($rest, 0, $offset) . substr($rest, $offset + strlen($full));
+        $assembled = $h2 . "\n" . $figure . '<div class="music-album-chapter-body">' . $rest . '</div>';
+        return array($assembled, true, 'board', 'top', 'above', false);
+    }
+
+    if (preg_match('/(?:<p>\s*)?(<figure\b[^>]*\balbum-shot\b[^>]*>.*?<\/figure>)(?:\s*<\/p>)?/is', $rest, $shotMatch, PREG_OFFSET_CAPTURE)
+        && $takeLeading($shotMatch)) {
         $figure = $shotMatch[1][0];
         $full = $shotMatch[0][0];
         $offset = $shotMatch[0][1];
@@ -235,7 +261,8 @@ function musicAlbumEnhanceChapterMedia($chapterHtml) {
                 $figure = preg_replace('/<figure\b/i', '<figure class="music-album-chapter-media"', $figure, 1);
             }
         }
-    } elseif (preg_match('/(?:<p>\s*)?(<a[^>]*\bdata-fancybox\b[^>]*>\s*<img\b[^>]*>\s*<\/a>)(?:\s*<\/p>)?/is', $rest, $imgMatch, PREG_OFFSET_CAPTURE)) {
+    } elseif (preg_match('/(?:<p>\s*)?(<a[^>]*\bdata-fancybox\b[^>]*>\s*<img\b[^>]*>\s*<\/a>)(?:\s*<\/p>)?/is', $rest, $imgMatch, PREG_OFFSET_CAPTURE)
+        && $takeLeading($imgMatch)) {
         $imgHtml = $imgMatch[1][0];
         $full = $imgMatch[0][0];
         $offset = $imgMatch[0][1];
