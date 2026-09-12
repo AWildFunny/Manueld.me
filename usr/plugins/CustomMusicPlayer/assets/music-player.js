@@ -28,6 +28,13 @@
         progressEl.style.strokeDashoffset = String(RING_LEN * (1 - r));
     }
 
+    function buildMetingUrl(tpl, server, type, id) {
+        return String(tpl || 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id')
+            .replace(':server', encodeURIComponent(server))
+            .replace(':type', encodeURIComponent(type))
+            .replace(':id', encodeURIComponent(id));
+    }
+
     function angleRatioFromEvent(wrapEl, event) {
         var rect = wrapEl.getBoundingClientRect();
         var cx = rect.left + rect.width / 2;
@@ -189,6 +196,97 @@
         if (state.mode === 'scroll') {
             this.attachScrollObserver(state);
         }
+
+        this.hydratePlatformMeta(state);
+    };
+
+    MusicPlayerManager.prototype.hydratePlatformMeta = function (state) {
+        var el = state.el;
+        var server = el.dataset.mpServer || '';
+        var songId = el.dataset.mpSong || '';
+        if (!server || !songId) {
+            return;
+        }
+
+        var title = (el.dataset.title || '').trim();
+        var artistNode = el.querySelector('.music-player-artist');
+        var hasArtist = !!(artistNode && artistNode.textContent.trim());
+        var hasCover = !!(el.dataset.cover || '').trim();
+        var needsTitle = !title || title === '未命名曲目';
+        if (!needsTitle && hasArtist && hasCover) {
+            return;
+        }
+
+        var url = buildMetingUrl(el.dataset.mpApi, server, 'song', songId);
+        var self = this;
+        fetch(url, { credentials: 'omit' }).then(function (res) {
+            if (!res.ok) {
+                throw new Error('meting');
+            }
+            return res.json();
+        }).then(function (data) {
+            var item = Array.isArray(data) ? data[0] : data;
+            if (!item) {
+                return;
+            }
+            var nextTitle = item.title || item.name || '';
+            var nextArtist = item.author || item.artist || '';
+            if (Array.isArray(nextArtist)) {
+                nextArtist = nextArtist.join(' / ');
+            }
+            var nextCover = item.pic || item.cover || '';
+            if (needsTitle && nextTitle) {
+                el.dataset.title = nextTitle;
+                var titleNode = el.querySelector('.music-player-title');
+                if (titleNode) {
+                    titleNode.textContent = nextTitle;
+                }
+                state.toggle.setAttribute('aria-label', '播放 ' + nextTitle);
+            }
+            if (!hasArtist && nextArtist) {
+                if (artistNode) {
+                    artistNode.textContent = nextArtist;
+                } else {
+                    var caption = el.querySelector('.music-player-meta');
+                    var titleEl = el.querySelector('.music-player-title');
+                    artistNode = document.createElement('p');
+                    artistNode.className = 'music-player-artist';
+                    artistNode.textContent = nextArtist;
+                    if (caption && titleEl && titleEl.nextSibling) {
+                        caption.insertBefore(artistNode, titleEl.nextSibling);
+                    } else if (caption && titleEl) {
+                        titleEl.insertAdjacentElement('afterend', artistNode);
+                    }
+                }
+            }
+            if (!hasCover && nextCover) {
+                el.dataset.cover = nextCover;
+                var disc = el.querySelector('.music-player-disc');
+                var coverEl = disc ? disc.querySelector('.music-player-cover') : null;
+                var label = el.dataset.title || nextTitle || '';
+                if (coverEl && coverEl.tagName === 'IMG') {
+                    coverEl.src = nextCover;
+                    coverEl.alt = label;
+                    coverEl.classList.remove('music-player-cover--placeholder');
+                } else if (disc) {
+                    var img = document.createElement('img');
+                    img.className = 'music-player-cover';
+                    img.src = nextCover;
+                    img.alt = label;
+                    img.loading = 'lazy';
+                    if (coverEl) {
+                        disc.replaceChild(img, coverEl);
+                    } else {
+                        disc.insertBefore(img, disc.firstChild);
+                    }
+                }
+            }
+            if (self.currentPlayer === state) {
+                self.updateDockContent(state);
+            }
+        }).catch(function () {
+            // keep placeholder
+        });
     };
 
     MusicPlayerManager.prototype.bindRingSeek = function (state) {

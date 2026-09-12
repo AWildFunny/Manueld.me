@@ -3,7 +3,7 @@
  * 文章内嵌唱片式音乐播放器，支持环形进度、悬浮迷你条、进页提示、自定义/网易云插入
  *
  * @package CustomMusicPlayer
- * @version 2.3.1
+ * @version 2.3.2
  * @dependence 9.9.2-*
  */
 
@@ -37,7 +37,7 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
             null,
             'https://meting.mikus.ink/api?server=:server&type=:type&id=:id',
             'Meting API 地址',
-            '用于解析网易云等平台。占位符：<code>:server</code> <code>:type</code> <code>:id</code>。第三方接口可能失效，可自行部署后替换。'
+            '用于拼接播放地址，并供浏览器补拉歌名/封面。占位符：<code>:server</code> <code>:type</code> <code>:id</code>。第三方接口可能失效，可自行部署后替换。'
         );
         $form->addInput($api);
 
@@ -116,24 +116,12 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         $noticeOn = in_array($notice, array('1', 'true', 'yes', 'on'), true);
 
         if (in_array($from, array('netease', 'tencent'), true)) {
+            $platformId = self::normalizePlatformId($from, $platformId);
             if ($platformId === '') {
                 return '<p class="music-player-error" role="alert">音乐播放器缺少平台歌曲 ID。</p>';
             }
-            $resolved = self::resolvePlatformTrack($from, $platformId);
-            if ($resolved === null) {
-                return '<p class="music-player-error" role="alert">无法解析该曲目（' . htmlspecialchars($from, ENT_QUOTES, 'UTF-8') . ' / ' . htmlspecialchars($platformId, ENT_QUOTES, 'UTF-8') . '），请检查 ID 或插件里的 Meting API。</p>';
-            }
-            if ($title === '') {
-                $title = $resolved['title'];
-            }
-            if ($artist === '') {
-                $artist = $resolved['artist'];
-            }
             if ($src === '') {
-                $src = $resolved['src'];
-            }
-            if ($cover === '') {
-                $cover = $resolved['cover'];
+                $src = self::buildMetingUrl($from, 'url', $platformId);
             }
         }
 
@@ -153,6 +141,12 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         $coverEsc = htmlspecialchars($cover, ENT_QUOTES, 'UTF-8');
         $modeEsc = htmlspecialchars($mode, ENT_QUOTES, 'UTF-8');
         $noticeEsc = $noticeOn ? '1' : '0';
+        $platformAttrs = '';
+        if (in_array($from, array('netease', 'tencent'), true) && $platformId !== '') {
+            $platformAttrs = ' data-mp-server="' . htmlspecialchars($from, ENT_QUOTES, 'UTF-8') . '"'
+                . ' data-mp-song="' . htmlspecialchars($platformId, ENT_QUOTES, 'UTF-8') . '"'
+                . ' data-mp-api="' . htmlspecialchars(self::metingApiTpl(), ENT_QUOTES, 'UTF-8') . '"';
+        }
 
         $coverHtml = $cover !== ''
             ? '<img class="music-player-cover" src="' . $coverEsc . '" alt="' . $titleEsc . '" loading="lazy">'
@@ -170,7 +164,7 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         $ringSvg = self::ringSvg('music-player-ring');
 
         return '
-<figure class="music-player" id="' . $id . '" data-mp-id="' . $id . '" data-src="' . $srcEsc . '" data-mode="' . $modeEsc . '" data-title="' . $titleEsc . '" data-cover="' . $coverEsc . '" data-notice="' . $noticeEsc . '">
+<figure class="music-player" id="' . $id . '" data-mp-id="' . $id . '" data-src="' . $srcEsc . '" data-mode="' . $modeEsc . '" data-title="' . $titleEsc . '" data-cover="' . $coverEsc . '" data-notice="' . $noticeEsc . '"' . $platformAttrs . '>
     <div class="music-player-body">
         <div class="music-player-vinyl-wrap">
             <button type="button" class="music-player-disc-btn" aria-label="播放 ' . $titleEsc . '">
@@ -218,17 +212,10 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
     }
 
     /**
-     * @param string $server netease|tencent
-     * @param string $id
-     * @return array{title:string,artist:string,src:string,cover:string}|null
+     * @return string
      */
-    private static function resolvePlatformTrack($server, $id)
+    private static function metingApiTpl()
     {
-        $id = preg_replace('/\D+/', '', $id);
-        if ($id === '') {
-            return null;
-        }
-
         $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
         try {
             $plugin = Helper::options()->plugin('CustomMusicPlayer');
@@ -236,16 +223,53 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
                 $apiTpl = trim($plugin->metingApi);
             }
         } catch (Exception $e) {
-            // use default
         }
 
-        $url = str_replace(
-            array(':server', ':type', ':id'),
-            array(rawurlencode($server), 'song', rawurlencode($id)),
-            $apiTpl
-        );
+        return $apiTpl;
+    }
 
-        $json = self::httpGet($url);
+    /**
+     * @param string $server netease|tencent
+     * @param string $id
+     * @return string
+     */
+    private static function normalizePlatformId($server, $id)
+    {
+        $id = trim((string) $id);
+        if ($server === 'tencent') {
+            return preg_replace('/[^a-zA-Z0-9]/', '', $id);
+        }
+        return preg_replace('/\D+/', '', $id);
+    }
+
+    /**
+     * @param string $server
+     * @param string $type song|url|pic|lrc
+     * @param string $id
+     * @return string
+     */
+    private static function buildMetingUrl($server, $type, $id)
+    {
+        return str_replace(
+            array(':server', ':type', ':id'),
+            array(rawurlencode($server), rawurlencode($type), rawurlencode($id)),
+            self::metingApiTpl()
+        );
+    }
+
+    /**
+     * @param string $server netease|tencent
+     * @param string $id
+     * @return array{title:string,artist:string,src:string,cover:string}|null
+     */
+    private static function resolvePlatformTrack($server, $id)
+    {
+        $id = self::normalizePlatformId($server, $id);
+        if ($id === '') {
+            return null;
+        }
+
+        $json = self::httpGet(self::buildMetingUrl($server, 'song', $id));
         if ($json === null || $json === '') {
             return null;
         }
@@ -396,7 +420,7 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
         }
 
         $base = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets/music-player.js';
-        echo '<script src="' . htmlspecialchars($base . '?ver=2.3.0', ENT_QUOTES, 'UTF-8') . '" defer></script>';
+        echo '<script src="' . htmlspecialchars($base . '?ver=2.3.2', ENT_QUOTES, 'UTF-8') . '" defer></script>';
     }
 
     /**
@@ -428,13 +452,10 @@ class CustomMusicPlayer_Plugin implements Typecho_Plugin_Interface
             return;
         }
 
-        $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
+        $apiTpl = self::metingApiTpl();
         $playerHint = '点按唱片播放 · 拖动外环调节进度';
         try {
             $plugin = Helper::options()->plugin('CustomMusicPlayer');
-            if (!empty($plugin->metingApi)) {
-                $apiTpl = trim($plugin->metingApi);
-            }
             if (isset($plugin->playerHint)) {
                 $playerHint = trim((string) $plugin->playerHint);
             }
@@ -555,15 +576,7 @@ HTML;
         $pluginUrl = Helper::options()->pluginUrl . '/CustomMusicPlayer/assets';
         $css = htmlspecialchars($pluginUrl . '/admin-inserter.css?ver=2.3.0', ENT_QUOTES, 'UTF-8');
         $js = htmlspecialchars($pluginUrl . '/admin-inserter.js?ver=2.3.0', ENT_QUOTES, 'UTF-8');
-
-        $apiTpl = 'https://meting.mikus.ink/api?server=:server&type=:type&id=:id';
-        try {
-            $plugin = Helper::options()->plugin('CustomMusicPlayer');
-            if (!empty($plugin->metingApi)) {
-                $apiTpl = trim($plugin->metingApi);
-            }
-        } catch (Exception $e) {
-        }
+        $apiTpl = self::metingApiTpl();
         echo '<link rel="stylesheet" href="' . $css . '">';
         echo '<script>window.CMP_METING_API=' . json_encode($apiTpl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';</script>';
         echo <<<'HTML'
