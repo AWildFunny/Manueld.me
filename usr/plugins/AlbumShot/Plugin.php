@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.5.0
+ * @version 1.6.0
  * @dependence 9.9.2-*
  */
 
@@ -183,7 +183,13 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
           <option value="16:9">16:9</option>
           <option value="4:3">4:3</option>
           <option value="1:1">1:1</option>
+          <option value="custom">自定义</option>
         </select>
+        <span id="as-ratio-custom" class="as-ratio-custom" hidden>
+          <input type="number" id="as-ratio-w" min="0.1" max="99" step="0.1" value="3" title="宽">
+          <span class="as-ratio-colon">:</span>
+          <input type="number" id="as-ratio-h" min="0.1" max="99" step="0.1" value="2" title="高">
+        </span>
       </span>
     </p>
     <div id="as-custom-wrap" hidden>
@@ -241,8 +247,8 @@ HTML;
             'boot' => array(
                 'images' => self::listImageAttachments(),
             ),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.5.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.5.0'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.6.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.6.0'),
         ));
     }
 
@@ -515,7 +521,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.5.0';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.6.0';
         echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }

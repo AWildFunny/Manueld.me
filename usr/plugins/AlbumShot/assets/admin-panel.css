@@ -18,6 +18,55 @@
     display: none !important;
 }
 
+.as-ratio-custom {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.as-ratio-custom[hidden] {
+    display: none !important;
+}
+
+.as-ratio-custom input[type="number"] {
+    width: 4.2em;
+    min-width: 0;
+    margin: 0;
+}
+
+.as-ratio-colon {
+    color: #64748b;
+    font-weight: 700;
+}
+
+.as-board-frame {
+    position: relative;
+}
+
+.as-board-ratio-handle {
+    display: none;
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    bottom: -5px;
+    height: 10px;
+    border-radius: 6px;
+    background: #4E7289;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
+    cursor: ns-resize;
+    z-index: 5;
+}
+
+.as-board-ui.is-ratio-custom .as-board-ratio-handle:not([hidden]) {
+    display: block;
+}
+
+.as-board-ratio-handle:hover,
+.as-board-ratio-handle:active {
+    background: #3d5c6e;
+}
+
 .as-toolbar-actions {
     display: flex;
     flex-wrap: wrap;

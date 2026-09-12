@@ -149,6 +149,14 @@
         $('#as-ratio-field').prop('hidden', !board);
         $('#as-board-clear').prop('hidden', !board);
         $('#as-custom-wrap').prop('hidden', board || ($('#as-layout').val() || '') !== 'custom');
+        var ratioCustom = board && ($('#as-ratio').val() || '') === 'custom';
+        $('#as-ratio-custom').prop('hidden', !ratioCustom);
+        $('.as-board-ratio-handle').prop('hidden', !ratioCustom);
+        $('.as-board-ui').toggleClass('is-ratio-custom', ratioCustom);
+        var $hint = $('.as-board-hint');
+        if ($hint.length) {
+            $hint.text(boardHint());
+        }
 
         var presets = {
             duo: ['duo-split', 'duo-main-side', 'duo-overlap'],
@@ -275,8 +283,33 @@
         renderLibrary();
     }
 
+    function roundRatio(n) {
+        n = parseFloat(n);
+        if (!isFinite(n) || n <= 0) {
+            return 0;
+        }
+        return Math.round(n * 100) / 100;
+    }
+
+    function currentRatio() {
+        var v = $('#as-ratio').val() || '3:2';
+        if (v === 'custom') {
+            var w = roundRatio($('#as-ratio-w').val()) || 3;
+            var h = roundRatio($('#as-ratio-h').val()) || 2;
+            return w + ':' + h;
+        }
+        return v;
+    }
+
     function ratioCss() {
-        return ($('#as-ratio').val() || '3:2').replace(':', ' / ');
+        return currentRatio().replace(':', ' / ');
+    }
+
+    function boardHint() {
+        if ($('#as-ratio').val() === 'custom') {
+            return '拖动画布下沿调整画幅 · 框内拖动裁剪 · 左下角移动 · 右下角缩放';
+        }
+        return '框内拖动裁剪 · 左下角移动画框 · 右下角缩放 · 滚轮变焦';
     }
 
     function applyBoardRatio() {
@@ -306,8 +339,11 @@
 
     function boardEditorHtml() {
         return '<div class="as-board-ui as-drop-stage" data-as-drop="1">'
-            + '<p class="as-board-hint">框内拖动裁剪 · 左下角移动画框 · 右下角缩放 · 滚轮变焦</p>'
+            + '<p class="as-board-hint">' + boardHint() + '</p>'
+            + '<div class="as-board-frame">'
             + '<div id="as-board" class="as-board" style="--board-ratio:' + ratioCss() + ';aspect-ratio:' + ratioCss() + '"></div>'
+            + '<i class="as-board-ratio-handle" title="拖动下沿调整画幅" hidden></i>'
+            + '</div>'
             + '</div>';
     }
 
@@ -422,11 +458,11 @@
     }
 
     function buildBoardHtml() {
-        var ratio = $('#as-ratio').val() || '3:2';
-        var ratioCss = ratio.replace(':', ' / ');
+        var ratio = currentRatio();
+        var ratioCssVal = ratio.replace(':', ' / ');
         var html = '<div class="album-board" data-ratio="' + escapeHtml(ratio) + '">'
-            + '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' + escapeHtml(ratioCss)
-            + ';overflow:hidden;--board-ratio:' + escapeHtml(ratioCss) + '">';
+            + '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' + escapeHtml(ratioCssVal)
+            + ';overflow:hidden;--board-ratio:' + escapeHtml(ratioCssVal) + '">';
         items.forEach(function (it) {
             ensureCrop(it);
             var box = 'position:absolute;left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
@@ -507,6 +543,7 @@
                     window.setTimeout(function () {
                         paintBoard();
                         bindDropZone();
+                        syncUi();
                     }, 0);
                     return boardEditorHtml();
                 }
@@ -537,6 +574,14 @@
                 }
             } else if (id === 'as-preset') {
                 applyPreset($(this).val());
+            } else if (id === 'as-ratio') {
+                var v = $('#as-ratio').val() || '';
+                if (v !== 'custom' && v.indexOf(':') !== -1) {
+                    var parts = v.split(':');
+                    $('#as-ratio-w').val(parts[0]);
+                    $('#as-ratio-h').val(parts[1]);
+                }
+                syncUi();
             } else if (id === 'as-layout' || id === 'as-pos' || id === 'as-titlepos' || id === 'as-wrap') {
                 syncUi();
             }
@@ -550,7 +595,16 @@
                 applyBoardRatio();
                 paintBoard();
                 renderLibrary();
+                syncUi();
             }, 0);
+        });
+
+        $(document).on('input change', '#as-ratio-w, #as-ratio-h', function () {
+            if (($('#as-ratio').val() || '') !== 'custom') {
+                $('#as-ratio').val('custom');
+                syncUi();
+            }
+            applyBoardRatio();
         });
 
         $(document).on('click', '.as-board-remove', function (e) {
@@ -715,8 +769,43 @@
             e.stopPropagation();
         });
 
+        $(document).on('mousedown', '.as-board-ratio-handle', function (e) {
+            var board = document.getElementById('as-board');
+            if (!board) {
+                return;
+            }
+            var rect = board.getBoundingClientRect();
+            if (($('#as-ratio').val() || '') !== 'custom') {
+                $('#as-ratio').val('custom');
+                syncUi();
+            }
+            drag = {
+                mode: 'ratio',
+                startY: e.clientY,
+                startH: rect.height,
+                boxW: Math.max(rect.width, 1),
+                wPart: roundRatio($('#as-ratio-w').val()) || 3
+            };
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
         $(document).on('mousemove', function (e) {
-            if (!drag || !items[drag.i]) {
+            if (!drag) {
+                return;
+            }
+            if (drag.mode === 'ratio') {
+                var dy = e.clientY - drag.startY;
+                var newH = clamp(drag.startH + dy, drag.boxW * 0.28, drag.boxW * 2.4);
+                var hPart = roundRatio(drag.wPart * newH / drag.boxW);
+                if (hPart < 0.1) {
+                    hPart = 0.1;
+                }
+                $('#as-ratio-h').val(hPart);
+                applyBoardRatio();
+                return;
+            }
+            if (!items[drag.i]) {
                 return;
             }
             var it = items[drag.i];
