@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.6.0
+ * @version 1.7.0
  * @dependence 9.9.2-*
  */
 
@@ -222,11 +222,23 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
       <input type="text" id="as-alt" class="text w-100" placeholder="可选">
     </p>
     <p class="as-toolbar-actions">
+      <button type="button" class="btn btn-xs" id="as-add-text">添加文字</button>
       <button type="button" class="btn btn-xs" id="as-lib-refresh">刷新附件库</button>
       <button type="button" class="btn btn-xs" id="as-board-clear" hidden>清空画布</button>
       <input type="hidden" id="as-src" value="">
     </p>
-    <p class="description as-drop-hint">从下方图库<strong>拖到左侧预览</strong>，或点击选用。单图替换主图；多图/画布则加入画布。</p>
+    <div id="as-text-bar" class="as-text-bar" hidden>
+      <label>字号 <input type="number" id="as-text-fs" min="1.5" max="16" step="0.5" value="4.5" title="相对画幅宽度的百分比"></label>
+      <label>颜色 <input type="color" id="as-text-color" value="#ffffff"></label>
+      <select id="as-text-align" title="对齐">
+        <option value="left">左齐</option>
+        <option value="center">居中</option>
+        <option value="right">右齐</option>
+      </select>
+      <label><input type="checkbox" id="as-text-bold" checked> 粗体</label>
+      <label><input type="checkbox" id="as-text-shadow" checked> 阴影</label>
+    </div>
+    <p class="description as-drop-hint">从下方图库<strong>拖到左侧预览</strong>，或点击选用。「添加文字」可在画布上自由摆放，双击编辑，拖动位置与缩放，像幻灯片一样图文叠放。</p>
   </div>
   <div class="as-lib">
     <div class="as-lib-head">
@@ -247,8 +259,8 @@ HTML;
             'boot' => array(
                 'images' => self::listImageAttachments(),
             ),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.6.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.6.0'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.7.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.7.0'),
         ));
     }
 
@@ -312,28 +324,45 @@ HTML;
         }
 
         $items = array();
-        if (preg_match_all('/\[img\b([^\]]*)\]/i', $inner, $im, PREG_SET_ORDER)) {
+        if (preg_match_all('/\[img\b([^\]]*)\]|\[txt\b([^\]]*)\](.*?)\[\/txt\]/is', $inner, $im, PREG_SET_ORDER)) {
             foreach ($im as $row) {
-                $ia = self::parseAttributes($row[1]);
-                $src = isset($ia['src']) ? trim($ia['src']) : '';
-                if (!self::isSafeUrl($src)) {
+                if (stripos($row[0], '[img') === 0) {
+                    $ia = self::parseAttributes(isset($row[1]) ? $row[1] : '');
+                    $src = isset($ia['src']) ? trim($ia['src']) : '';
+                    if (!self::isSafeUrl($src)) {
+                        continue;
+                    }
+                    $hRaw = isset($ia['h']) ? trim($ia['h']) : '';
+                    $items[] = array(
+                        'kind' => 'image',
+                        'src' => $src,
+                        'alt' => isset($ia['alt']) ? trim($ia['alt']) : '',
+                        'x' => self::num($ia, 'x', 4),
+                        'y' => self::num($ia, 'y', 4),
+                        'w' => self::num($ia, 'w', 44),
+                        'h' => $hRaw === '' ? 0 : self::num($ia, 'h', 0),
+                        'ox' => self::num($ia, 'ox', 50),
+                        'oy' => self::num($ia, 'oy', 50),
+                        'zoom' => self::zoom($ia),
+                    );
                     continue;
                 }
-                $hRaw = isset($ia['h']) ? trim($ia['h']) : '';
+                $ta = self::parseAttributes(isset($row[2]) ? $row[2] : '');
                 $items[] = array(
-                    'src' => $src,
-                    'alt' => isset($ia['alt']) ? trim($ia['alt']) : '',
-                    'x' => self::num($ia, 'x', 4),
-                    'y' => self::num($ia, 'y', 4),
-                    'w' => self::num($ia, 'w', 44),
-                    'h' => $hRaw === '' ? 0 : self::num($ia, 'h', 0),
-                    'ox' => self::num($ia, 'ox', 50),
-                    'oy' => self::num($ia, 'oy', 50),
-                    'zoom' => self::zoom($ia),
+                    'kind' => 'text',
+                    'text' => isset($row[3]) ? $row[3] : '',
+                    'x' => self::num($ta, 'x', 8),
+                    'y' => self::num($ta, 'y', 12),
+                    'w' => self::num($ta, 'w', 40),
+                    'h' => self::num($ta, 'h', 18),
+                    'fs' => self::fontSize($ta),
+                    'color' => self::color(isset($ta['color']) ? $ta['color'] : '#ffffff'),
+                    'align' => self::align(isset($ta['align']) ? $ta['align'] : 'left'),
+                    'weight' => self::weight(isset($ta['weight']) ? $ta['weight'] : '700'),
+                    'shadow' => !isset($ta['shadow']) || $ta['shadow'] === '' || !in_array(strtolower($ta['shadow']), array('0', 'false', 'no', 'off'), true),
                 );
             }
         }
-        // 短代码若已被 Markdown 拆成 <img>，仍尽量收回画布
         if (empty($items) && preg_match_all('/<img\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\'][^>]*>/i', $inner, $hm, PREG_SET_ORDER)) {
             $n = count($hm);
             foreach ($hm as $i => $row) {
@@ -342,6 +371,7 @@ HTML;
                     continue;
                 }
                 $items[] = array(
+                    'kind' => 'image',
                     'src' => $src,
                     'alt' => '',
                     'x' => $n <= 1 ? 4 : ($i % 2 === 0 ? 2 : 51),
@@ -360,25 +390,63 @@ HTML;
 
         $ratioCss = htmlspecialchars($rw . ' / ' . $rh, ENT_QUOTES, 'UTF-8');
         $html = '<div class="album-board" data-ratio="' . htmlspecialchars($ratio, ENT_QUOTES, 'UTF-8') . '">';
-        $html .= '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' . $ratioCss . ';overflow:hidden;--board-ratio:' . $ratioCss . '">';
+        $html .= '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' . $ratioCss
+            . ';overflow:hidden;container-type:inline-size;--board-ratio:' . $ratioCss . '">';
         foreach ($items as $item) {
-            $h = !empty($item['h']) ? $item['h'] : 55;
-            $srcEsc = htmlspecialchars($item['src'], ENT_QUOTES, 'UTF-8');
-            $altEsc = htmlspecialchars($item['alt'], ENT_QUOTES, 'UTF-8');
-            $ox = isset($item['ox']) ? $item['ox'] : 50;
-            $oy = isset($item['oy']) ? $item['oy'] : 50;
-            $zoom = isset($item['zoom']) ? $item['zoom'] : 1;
-            $box = 'position:absolute;left:' . $item['x'] . '%;top:' . $item['y'] . '%;width:' . $item['w'] . '%;height:' . $h . '%;'
-                . 'overflow:hidden;margin:0;padding:0;--ox:' . $ox . '%;--oy:' . $oy . '%;--zoom:' . $zoom . ';';
-            $imgStyle = 'width:100%;height:100%;max-height:none;object-fit:cover;object-position:' . $ox . '% ' . $oy . '%;'
-                . 'transform:scale(' . $zoom . ');transform-origin:' . $ox . '% ' . $oy . '%;display:block;';
-            $html .= '<figure class="album-board-item is-crop" style="' . $box . '">';
-            $html .= '<a data-fancybox="gallery" href="' . $srcEsc . '" data-caption="' . $altEsc . '" style="display:block;width:100%;height:100%;line-height:0">';
-            $html .= '<img src="' . $srcEsc . '" alt="' . $altEsc . '" style="' . $imgStyle . '">';
-            $html .= '</a></figure>';
+            if (isset($item['kind']) && $item['kind'] === 'text') {
+                $html .= self::renderBoardText($item);
+            } else {
+                $html .= self::renderBoardImage($item);
+            }
         }
         $html .= '</div></div>';
         return $html;
+    }
+
+    private static function renderBoardImage($item)
+    {
+        $h = !empty($item['h']) ? $item['h'] : 55;
+        $srcEsc = htmlspecialchars($item['src'], ENT_QUOTES, 'UTF-8');
+        $altEsc = htmlspecialchars(isset($item['alt']) ? $item['alt'] : '', ENT_QUOTES, 'UTF-8');
+        $ox = isset($item['ox']) ? $item['ox'] : 50;
+        $oy = isset($item['oy']) ? $item['oy'] : 50;
+        $zoom = isset($item['zoom']) ? $item['zoom'] : 1;
+        $box = 'position:absolute;left:' . $item['x'] . '%;top:' . $item['y'] . '%;width:' . $item['w'] . '%;height:' . $h . '%;'
+            . 'overflow:hidden;margin:0;padding:0;--ox:' . $ox . '%;--oy:' . $oy . '%;--zoom:' . $zoom . ';';
+        $imgStyle = 'width:100%;height:100%;max-height:none;object-fit:cover;object-position:' . $ox . '% ' . $oy . '%;'
+            . 'transform:scale(' . $zoom . ');transform-origin:' . $ox . '% ' . $oy . '%;display:block;';
+        return '<figure class="album-board-item is-crop" style="' . $box . '">'
+            . '<a data-fancybox="gallery" href="' . $srcEsc . '" data-caption="' . $altEsc . '" style="display:block;width:100%;height:100%;line-height:0">'
+            . '<img src="' . $srcEsc . '" alt="' . $altEsc . '" style="' . $imgStyle . '">'
+            . '</a></figure>';
+    }
+
+    private static function renderBoardText($item)
+    {
+        $color = self::color(isset($item['color']) ? $item['color'] : '#ffffff');
+        $align = self::align(isset($item['align']) ? $item['align'] : 'left');
+        $weight = self::weight(isset($item['weight']) ? $item['weight'] : '700');
+        $fs = isset($item['fs']) ? floatval($item['fs']) : 4.5;
+        if ($fs < 1.5) {
+            $fs = 1.5;
+        }
+        if ($fs > 16) {
+            $fs = 16;
+        }
+        $shadow = !empty($item['shadow'])
+            ? 'text-shadow:0 1px 3px rgba(0,0,0,.55),0 0 12px rgba(0,0,0,.25);'
+            : '';
+        $text = isset($item['text']) ? $item['text'] : '';
+        $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+        $text = strip_tags($text);
+        $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        $text = nl2br($text);
+        $box = 'position:absolute;left:' . $item['x'] . '%;top:' . $item['y'] . '%;width:' . $item['w'] . '%;height:' . $item['h'] . '%;'
+            . 'z-index:3;overflow:hidden;margin:0;padding:0.3em 0.4em;box-sizing:border-box;'
+            . 'color:' . $color . ';text-align:' . $align . ';font-weight:' . $weight . ';'
+            . 'font-size:calc(' . $fs . ' * 1cqw);line-height:1.35;white-space:pre-wrap;word-break:break-word;'
+            . $shadow;
+        return '<div class="album-board-text" style="' . $box . '">' . $text . '</div>';
     }
 
     private static function num($attrs, $key, $default)
@@ -409,6 +477,42 @@ HTML;
             $v = 3;
         }
         return round($v, 2);
+    }
+
+    private static function fontSize($attrs)
+    {
+        $v = isset($attrs['fs']) ? floatval($attrs['fs']) : 4.5;
+        if ($v < 1.5) {
+            $v = 1.5;
+        }
+        if ($v > 16) {
+            $v = 16;
+        }
+        return round($v, 2);
+    }
+
+    private static function color($raw)
+    {
+        $raw = trim((string) $raw);
+        if (preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/', $raw)) {
+            return $raw;
+        }
+        return '#ffffff';
+    }
+
+    private static function align($raw)
+    {
+        $raw = strtolower(trim((string) $raw));
+        return in_array($raw, array('left', 'center', 'right'), true) ? $raw : 'left';
+    }
+
+    private static function weight($raw)
+    {
+        $raw = strtolower(trim((string) $raw));
+        if (in_array($raw, array('700', 'bold', 'bolder'), true)) {
+            return '700';
+        }
+        return '400';
     }
 
     public static function renderShot($matches)
@@ -506,7 +610,11 @@ HTML;
             $widget = Typecho_Widget::widget('Widget_Archive');
             if ($widget->is('single') && isset($widget->text)) {
                 $raw = (string) $widget->text;
-                if ($raw !== '' && (stripos($raw, '[album-shot') !== false || stripos($raw, '[album-board') !== false)) {
+                if ($raw !== '' && (
+                    stripos($raw, '[album-shot') !== false
+                    || stripos($raw, '[album-board') !== false
+                    || stripos($raw, 'album-board') !== false
+                )) {
                     self::$needsAssets = true;
                     return true;
                 }
@@ -521,7 +629,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.6.0';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.7.0';
         echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }

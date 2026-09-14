@@ -539,6 +539,16 @@ article.music-album-article nav.music-album-nav {
     min-height: 0;
     aspect-ratio: var(--board-ratio, 3 / 2);
     overflow: hidden;
+    container-type: inline-size;
+}
+
+.album-board-text {
+    position: absolute !important;
+    z-index: 3;
+    margin: 0 !important;
+    box-sizing: border-box;
+    pointer-events: none;
+    font-size: 18px;
 }
 
 .album-board-item {

@@ -8,6 +8,7 @@
     var selected = 0;
     var drag = null;
     var libDragUrl = '';
+    var editingText = -1;
 
     function escapeHtml(v) {
         return window.CI_escapeHtml ? window.CI_escapeHtml(v) : String(v || '')
@@ -157,6 +158,7 @@
         if ($hint.length) {
             $hint.text(boardHint());
         }
+        syncTextBar();
 
         var presets = {
             duo: ['duo-split', 'duo-main-side', 'duo-overlap'],
@@ -241,15 +243,55 @@
         }
     }
 
+    function isTextItem(it) {
+        return !!(it && it.type === 'text');
+    }
+
+    function ensureText(it) {
+        if (!it) {
+            return;
+        }
+        if (it.fs == null || isNaN(it.fs)) {
+            it.fs = 4.5;
+        }
+        if (!it.color) {
+            it.color = '#ffffff';
+        }
+        if (!it.align) {
+            it.align = 'left';
+        }
+        if (!it.weight) {
+            it.weight = '700';
+        }
+        if (it.shadow == null) {
+            it.shadow = 1;
+        }
+        if (!it.w) {
+            it.w = 40;
+        }
+        if (!it.h) {
+            it.h = 18;
+        }
+        if (it.text == null) {
+            it.text = '';
+        }
+    }
+
     function applyPreset(kind) {
-        if (!kind || kind === 'canvas' || !items.length) {
+        if (!kind || kind === 'canvas') {
+            return;
+        }
+        var imgs = items.filter(function (it) {
+            return !isTextItem(it);
+        });
+        if (!imgs.length) {
             return;
         }
         var slots = presetSlots(kind);
         if (!slots.length) {
             return;
         }
-        items.forEach(function (it, i) {
+        imgs.forEach(function (it, i) {
             ensureCrop(it);
             if (i < slots.length) {
                 it.x = slots[i].x;
@@ -306,10 +348,11 @@
     }
 
     function boardHint() {
+        var extra = ' · 「添加文字」后拖动摆放，双击编辑，滚轮改字号';
         if ($('#as-ratio').val() === 'custom') {
-            return '拖动画布下沿调整画幅 · 框内拖动裁剪 · 左下角移动 · 右下角缩放';
+            return '拖动画布下沿调整画幅 · 框内拖动裁剪 · 左下角移动 · 右下角缩放' + extra;
         }
-        return '框内拖动裁剪 · 左下角移动画框 · 右下角缩放 · 滚轮变焦';
+        return '框内拖动裁剪 · 左下角移动画框 · 右下角缩放 · 滚轮变焦' + extra;
     }
 
     function applyBoardRatio() {
@@ -323,6 +366,11 @@
     }
 
     function itemStyle(it) {
+        if (isTextItem(it)) {
+            ensureText(it);
+            return 'left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
+                + '--fs:' + it.fs + ';color:' + it.color + ';text-align:' + it.align + ';font-weight:' + it.weight + ';';
+        }
         ensureCrop(it);
         return 'left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
             + '--ox:' + it.ox + '%;--oy:' + it.oy + '%;--zoom:' + it.zoom + ';';
@@ -335,6 +383,37 @@
             return;
         }
         el.setAttribute('style', itemStyle(it));
+        if (isTextItem(it)) {
+            el.classList.toggle('has-shadow', !!it.shadow);
+        }
+    }
+
+    function syncTextBar() {
+        var it = items[selected];
+        var show = isBoardMode() && it && isTextItem(it);
+        $('#as-text-bar').prop('hidden', !show);
+        if (!show) {
+            return;
+        }
+        ensureText(it);
+        $('#as-text-fs').val(it.fs);
+        $('#as-text-color').val(/^#[0-9a-fA-F]{6}$/.test(it.color) ? it.color : '#ffffff');
+        $('#as-text-align').val(it.align);
+        $('#as-text-bold').prop('checked', String(it.weight) === '700' || it.weight === 'bold');
+        $('#as-text-shadow').prop('checked', !!it.shadow);
+    }
+
+    function applyTextBar() {
+        var it = items[selected];
+        if (!it || !isTextItem(it)) {
+            return;
+        }
+        it.fs = clamp(parseFloat($('#as-text-fs').val()) || 4.5, 1.5, 16);
+        it.color = $('#as-text-color').val() || '#ffffff';
+        it.align = $('#as-text-align').val() || 'left';
+        it.weight = $('#as-text-bold').prop('checked') ? '700' : '400';
+        it.shadow = $('#as-text-shadow').prop('checked') ? 1 : 0;
+        syncBoardFrame(selected);
     }
 
     function boardEditorHtml() {
@@ -352,15 +431,29 @@
         if (!$board.length) {
             return;
         }
+        if (editingText >= 0 && $board.find('.as-board-text-body[contenteditable="true"]').length) {
+            return;
+        }
         applyBoardRatio();
         if (!items.length) {
-            $board.html('<div class="as-board-empty">将右侧图片拖到此处，或点击选用</div>');
+            $board.html('<div class="as-board-empty">将右侧图片拖到此处，或点「添加文字」</div>');
+            syncTextBar();
             return;
         }
         var html = '';
         items.forEach(function (it, i) {
+            var on = i === selected ? ' is-on' : '';
+            if (isTextItem(it)) {
+                ensureText(it);
+                html += '<div class="as-board-item as-board-text' + (it.shadow ? ' has-shadow' : '') + on + '" data-i="' + i + '" data-type="text" style="' + itemStyle(it) + '">'
+                    + '<button type="button" class="as-board-remove" data-remove="' + i + '" title="移除文字" aria-label="移除">×</button>'
+                    + '<div class="as-board-text-body" data-i="' + i + '">' + escapeHtml(it.text).replace(/\n/g, '<br>') + '</div>'
+                    + '<i class="as-board-handle" data-resize="' + i + '" title="缩放文字框"></i>'
+                    + '</div>';
+                return;
+            }
             ensureCrop(it);
-            html += '<figure class="as-board-item is-crop' + (i === selected ? ' is-on' : '') + '" data-i="' + i + '" style="' + itemStyle(it) + '">'
+            html += '<figure class="as-board-item is-crop' + on + '" data-i="' + i + '" style="' + itemStyle(it) + '">'
                 + '<button type="button" class="as-board-remove" data-remove="' + i + '" title="从画布移除" aria-label="移除">×</button>'
                 + '<i class="as-board-move" data-move="' + i + '" title="移动画框"></i>'
                 + '<div class="as-board-crop" data-crop="' + i + '"><img src="' + escapeHtml(it.src) + '" alt="" draggable="false"></div>'
@@ -368,14 +461,18 @@
                 + '</figure>';
         });
         $board.html(html);
+        syncTextBar();
     }
 
     function addItem(url) {
         if (!isUsableUrl(url)) {
             return false;
         }
-        var n = items.length;
+        var n = items.filter(function (it) {
+            return !isTextItem(it);
+        }).length;
         items.push({
+            type: 'image',
             src: url,
             x: 6 + (n % 3) * 8,
             y: 8 + (n % 4) * 10,
@@ -393,6 +490,42 @@
         paintBoard();
         renderLibrary();
         return true;
+    }
+
+    function addText() {
+        if (!isBoardMode()) {
+            $('#as-cat').val('canvas');
+            syncUi();
+            var src = currentSrc();
+            if (isUsableUrl(src) && !items.some(function (it) {
+                return !isTextItem(it) && it.src === src;
+            })) {
+                addItem(src);
+            }
+        }
+        var n = items.filter(isTextItem).length;
+        items.push({
+            type: 'text',
+            text: '双击编辑文字',
+            x: 8 + (n % 3) * 6,
+            y: 12 + (n % 4) * 8,
+            w: 40,
+            h: 18,
+            fs: 4.5,
+            color: '#ffffff',
+            align: 'left',
+            weight: '700',
+            shadow: 1
+        });
+        selected = items.length - 1;
+        if (!$('#as-board').length && window.CI_refreshPreview) {
+            window.CI_refreshPreview();
+        }
+        window.setTimeout(function () {
+            paintBoard();
+            syncTextBar();
+            renderLibrary();
+        }, 0);
     }
 
     function applyImage(url) {
@@ -462,8 +595,25 @@
         var ratioCssVal = ratio.replace(':', ' / ');
         var html = '<div class="album-board" data-ratio="' + escapeHtml(ratio) + '">'
             + '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' + escapeHtml(ratioCssVal)
-            + ';overflow:hidden;--board-ratio:' + escapeHtml(ratioCssVal) + '">';
+            + ';overflow:hidden;container-type:inline-size;--board-ratio:' + escapeHtml(ratioCssVal) + '">';
         items.forEach(function (it) {
+            if (isTextItem(it)) {
+                ensureText(it);
+                var shadow = it.shadow
+                    ? 'text-shadow:0 1px 3px rgba(0,0,0,.55),0 0 12px rgba(0,0,0,.25);'
+                    : '';
+                var text = escapeHtml(it.text || '').replace(/\n/g, '<br>');
+                var tbox = 'position:absolute;left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
+                    + 'z-index:3;overflow:hidden;margin:0;padding:0.3em 0.4em;box-sizing:border-box;'
+                    + 'color:' + escapeHtml(it.color) + ';text-align:' + escapeHtml(it.align) + ';font-weight:' + escapeHtml(String(it.weight)) + ';'
+                    + 'font-size:calc(' + it.fs + ' * 1cqw);line-height:1.35;white-space:pre-wrap;word-break:break-word;'
+                    + shadow;
+                html += '<div class="album-board-text" style="' + tbox + '">' + text + '</div>';
+                return;
+            }
+            if (!isUsableUrl(it.src)) {
+                return;
+            }
             ensureCrop(it);
             var box = 'position:absolute;left:' + it.x + '%;top:' + it.y + '%;width:' + it.w + '%;height:' + it.h + '%;'
                 + 'overflow:hidden;margin:0;padding:0;--ox:' + it.ox + '%;--oy:' + it.oy + '%;--zoom:' + it.zoom + ';';
@@ -502,7 +652,7 @@
             return wrapForMarkdown('[album-shot ' + parts.join(' ') + ']');
         }
         if (items.length < 1) {
-            window.alert('请至少加入一张图片');
+            window.alert('请至少加入一张图片或一段文字');
             return '';
         }
         // 直接插入与前台一致的 HTML，避免 [img][img] 被 HyperDown 当成引用链接拆成上下叠图
@@ -621,12 +771,62 @@
                 return;
             }
             var tag = (e.target && e.target.tagName) || '';
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) {
                 return;
             }
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 e.preventDefault();
                 removeItem(selected);
+            }
+        });
+
+        $(document).on('click', '#as-add-text', function (e) {
+            e.preventDefault();
+            addText();
+        });
+
+        $(document).on('input change', '#as-text-fs, #as-text-color, #as-text-align, #as-text-bold, #as-text-shadow', function () {
+            applyTextBar();
+        });
+
+        $(document).on('dblclick', '.as-board-text-body', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var i = parseInt(this.getAttribute('data-i'), 10);
+            if (!items[i] || !isTextItem(items[i])) {
+                return;
+            }
+            selected = i;
+            editingText = i;
+            drag = null;
+            this.contentEditable = 'true';
+            this.focus();
+            try {
+                var range = document.createRange();
+                range.selectNodeContents(this);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } catch (err) {}
+            syncTextBar();
+        });
+
+        $(document).on('blur', '.as-board-text-body', function () {
+            var i = parseInt(this.getAttribute('data-i'), 10);
+            if (!items[i] || !isTextItem(items[i])) {
+                return;
+            }
+            var text = String(this.innerText || '').replace(/\u00a0/g, ' ');
+            items[i].text = $.trim(text) || '双击编辑文字';
+            this.contentEditable = 'false';
+            editingText = -1;
+        });
+
+        $(document).on('keydown', '.as-board-text-body', function (e) {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                this.blur();
+                e.preventDefault();
             }
         });
 
@@ -698,16 +898,19 @@
             if ($(e.target).closest('.as-board-handle, .as-board-remove, .as-board-move').length) {
                 return;
             }
+            if ($(e.target).closest('.as-board-text-body[contenteditable="true"]').length) {
+                return;
+            }
             var i = parseInt($(this).data('i'), 10);
             if (!items[i]) {
                 return;
             }
             selected = i;
-            ensureCrop(items[i]);
             $('.as-board-item').removeClass('is-on');
             $(this).addClass('is-on');
+            syncTextBar();
             var rect = this.getBoundingClientRect();
-            var mode = (e.altKey || e.shiftKey) ? 'move' : 'crop';
+            var mode = isTextItem(items[i]) ? 'move' : ((e.altKey || e.shiftKey) ? 'move' : 'crop');
             if (mode === 'move') {
                 var start = pctFromEvent(e, $('#as-board'));
                 drag = {
@@ -717,6 +920,7 @@
                     oy: start.y - items[i].y
                 };
             } else {
+                ensureCrop(items[i]);
                 drag = {
                     mode: 'crop',
                     i: i,
@@ -739,6 +943,7 @@
             selected = i;
             $('.as-board-item').removeClass('is-on');
             $(this).closest('.as-board-item').addClass('is-on');
+            syncTextBar();
             var start = pctFromEvent(e, $('#as-board'));
             drag = {
                 mode: 'move',
@@ -756,7 +961,12 @@
                 return;
             }
             selected = i;
-            ensureCrop(items[i]);
+            if (!isTextItem(items[i])) {
+                ensureCrop(items[i]);
+            }
+            $('.as-board-item').removeClass('is-on');
+            $(this).closest('.as-board-item').addClass('is-on');
+            syncTextBar();
             drag = {
                 mode: 'resize',
                 i: i,
@@ -828,8 +1038,9 @@
                 var bh = Math.max($board.height(), 1);
                 var dw = (e.clientX - drag.startX) / bw * 100;
                 var dh = (e.clientY - drag.startY) / bh * 100;
-                it.w = clamp(Math.round(drag.startW + dw), 12, 96);
-                it.h = clamp(Math.round(drag.startH + dh), 12, 96);
+                var minSize = isTextItem(it) ? 8 : 12;
+                it.w = clamp(Math.round(drag.startW + dw), minSize, 96);
+                it.h = clamp(Math.round(drag.startH + dh), minSize, 96);
             }
             syncBoardFrame(drag.i);
         });
@@ -849,6 +1060,21 @@
                 }
                 var i = parseInt(item.getAttribute('data-i'), 10);
                 if (!items[i]) {
+                    return;
+                }
+                if (isTextItem(items[i])) {
+                    if (editingText === i) {
+                        return;
+                    }
+                    e.preventDefault();
+                    selected = i;
+                    ensureText(items[i]);
+                    var tDelta = e.deltaY > 0 ? -0.3 : 0.3;
+                    items[i].fs = Math.round(clamp(items[i].fs + tDelta, 1.5, 16) * 10) / 10;
+                    $('.as-board-item').removeClass('is-on');
+                    $(item).addClass('is-on');
+                    syncBoardFrame(i);
+                    syncTextBar();
                     return;
                 }
                 e.preventDefault();
