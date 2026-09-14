@@ -4,7 +4,7 @@
  *
  * @package AlbumShot
  * @author Manueld
- * @version 1.7.0
+ * @version 1.8.0
  * @dependence 9.9.2-*
  */
 
@@ -238,7 +238,16 @@ class AlbumShot_Plugin implements Typecho_Plugin_Interface
       <label><input type="checkbox" id="as-text-bold" checked> 粗体</label>
       <label><input type="checkbox" id="as-text-shadow" checked> 阴影</label>
     </div>
-    <p class="description as-drop-hint">从下方图库<strong>拖到左侧预览</strong>，或点击选用。「添加文字」可在画布上自由摆放，双击编辑，拖动位置与缩放，像幻灯片一样图文叠放。</p>
+    <p class="description as-drop-hint">从下方图库<strong>拖到左侧预览</strong>，或点击选用。「添加文字」可在画布上自由摆放。插入后会出现在下方历史里，点选即可继续改，再次插入会替换正文中的原块。</p>
+    <p id="as-hist-status" class="as-hist-status" hidden></p>
+  </div>
+  <div class="as-history">
+    <div class="as-lib-head">
+      <span>历史 / 再编辑</span>
+      <span id="as-hist-count" class="as-lib-count">0</span>
+    </div>
+    <div id="as-hist-list" class="as-hist-list"></div>
+    <p id="as-hist-empty" class="as-lib-empty">插入过的图文会列在这里。点选加载到画布，改完再插入即可覆盖原文。</p>
   </div>
   <div class="as-lib">
     <div class="as-lib-head">
@@ -259,8 +268,8 @@ HTML;
             'boot' => array(
                 'images' => self::listImageAttachments(),
             ),
-            'css' => array($pluginUrl . '/admin-panel.css?ver=1.7.0'),
-            'js' => array($pluginUrl . '/admin-panel.js?ver=1.7.0'),
+            'css' => array($pluginUrl . '/admin-panel.css?ver=1.8.0'),
+            'js' => array($pluginUrl . '/admin-panel.js?ver=1.8.0'),
         ));
     }
 
@@ -629,7 +638,7 @@ HTML;
         if (!self::shouldLoadAssets()) {
             return;
         }
-        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.7.0';
+        $css = Helper::options()->pluginUrl . '/AlbumShot/assets/album-shot.css?ver=1.8.0';
         echo '<link rel="stylesheet" href="' . htmlspecialchars($css, ENT_QUOTES, 'UTF-8') . '">' . "\n";
     }
 }

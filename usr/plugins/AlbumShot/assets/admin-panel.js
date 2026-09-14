@@ -9,6 +9,13 @@
     var drag = null;
     var libDragUrl = '';
     var editingText = -1;
+    var activeId = '';
+    var replaceOnInsert = false;
+    var replaceNeedle = '';
+    var loadingSnap = false;
+    var historyView = [];
+    var HIST_KEY = 'albumShot.history.v1';
+    var HIST_MAX = 30;
 
     function escapeHtml(v) {
         return window.CI_escapeHtml ? window.CI_escapeHtml(v) : String(v || '')
@@ -587,13 +594,615 @@
     }
 
     function wrapForMarkdown(code) {
-        return '\n\n' + code + '\n\n';
+        return String(code || '').trim();
+    }
+
+    function newRecordId() {
+        return 'as' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36);
+    }
+
+    function postCid() {
+        var el = document.querySelector('input[name="cid"]');
+        var n = el ? parseInt(el.value, 10) : 0;
+        if (n) {
+            return String(n);
+        }
+        var m = String(window.location.search || '').match(/[?&]cid=(\d+)/);
+        return m ? m[1] : '0';
+    }
+
+    function postTitle() {
+        return $.trim($('#title').val() || $('input[name="title"]').val() || '') || '未命名';
+    }
+
+    function editorValue() {
+        var ta = document.getElementById('text');
+        return ta ? String(ta.value || '') : '';
+    }
+
+    function encodeDraft(obj) {
+        try {
+            var json = JSON.stringify(obj);
+            var b64 = window.btoa(unescape(encodeURIComponent(json)));
+            return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        } catch (err) {
+            return '';
+        }
+    }
+
+    function decodeDraft(raw) {
+        try {
+            var s = String(raw || '').replace(/-/g, '+').replace(/_/g, '/');
+            while (s.length % 4) {
+                s += '=';
+            }
+            return JSON.parse(decodeURIComponent(escape(window.atob(s))));
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function captureSnapshot() {
+        return {
+            v: 1,
+            id: activeId,
+            cat: cat(),
+            preset: $('#as-preset').val() || '',
+            ratio: $('#as-ratio').val() || '3:2',
+            ratioW: $('#as-ratio-w').val() || '3',
+            ratioH: $('#as-ratio-h').val() || '2',
+            layout: $('#as-layout').val() || 'auto',
+            pos: $('#as-pos').val() || 'top',
+            titlepos: $('#as-titlepos').val() || 'above',
+            wrap: $('#as-wrap').prop('checked') ? 1 : 0,
+            alt: $.trim($('#as-alt').val()),
+            src: currentSrc(),
+            items: JSON.parse(JSON.stringify(items || []))
+        };
+    }
+
+    function snapshotLabel(snap) {
+        var names = { single: '单图', duo: '双图', multi: '多图', canvas: '画布' };
+        if (!snap) {
+            return '图文';
+        }
+        if ((snap.cat || 'single') === 'single') {
+            return (names.single) + ' · ' + (snap.layout || 'auto');
+        }
+        var imgs = 0;
+        var texts = 0;
+        (snap.items || []).forEach(function (it) {
+            if (it && it.type === 'text') {
+                texts += 1;
+            } else {
+                imgs += 1;
+            }
+        });
+        var bits = [names[snap.cat] || '画布'];
+        if (imgs) {
+            bits.push(imgs + '图');
+        }
+        if (texts) {
+            bits.push(texts + '字');
+        }
+        if (snap.ratio === 'custom') {
+            bits.push((snap.ratioW || '3') + ':' + (snap.ratioH || '2'));
+        } else if (snap.ratio) {
+            bits.push(snap.ratio);
+        }
+        return bits.join(' · ');
+    }
+
+    function snapshotThumb(snap) {
+        if (snap && snap.src && isUsableUrl(snap.src)) {
+            return snap.src;
+        }
+        var found = '';
+        (snap && snap.items ? snap.items : []).some(function (it) {
+            if (it && it.src && isUsableUrl(it.src)) {
+                found = it.src;
+                return true;
+            }
+            return false;
+        });
+        return found;
+    }
+
+    function formatHistTime(ts) {
+        var d = new Date(ts);
+        if (!isFinite(d.getTime()) || !ts) {
+            return '';
+        }
+        var p = function (n) {
+            return n < 10 ? '0' + n : String(n);
+        };
+        return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
+    function readLocalHistory() {
+        try {
+            var data = JSON.parse(window.localStorage.getItem(HIST_KEY) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (err) {
+            return [];
+        }
+    }
+
+    function writeLocalHistory(list) {
+        try {
+            window.localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, HIST_MAX)));
+        } catch (err) {}
+    }
+
+    function persistHistory() {
+        if (!activeId) {
+            activeId = newRecordId();
+        }
+        var snap = captureSnapshot();
+        snap.id = activeId;
+        var rec = {
+            id: activeId,
+            cid: postCid(),
+            title: postTitle(),
+            savedAt: Date.now(),
+            snapshot: snap
+        };
+        var list = readLocalHistory().filter(function (row) {
+            return row && row.id !== activeId;
+        });
+        list.unshift(rec);
+        writeLocalHistory(list);
+        return rec;
+    }
+
+    function removeLocalHistory(id) {
+        writeLocalHistory(readLocalHistory().filter(function (row) {
+            return row && row.id !== id;
+        }));
+        renderHistory();
+    }
+
+    function wrapRecord(inner, id) {
+        return '<!--album-shot:' + id + '-->\n' + String(inner || '').trim() + '\n<!--/album-shot:' + id + '-->';
+    }
+
+    function writeEditorValue(next) {
+        var ta = document.getElementById('text');
+        if (!ta) {
+            window.alert('未找到正文编辑框');
+            return false;
+        }
+        ta.value = next;
+        ta.focus();
+        if (typeof $ !== 'undefined') {
+            $(ta).trigger('input').trigger('change');
+        }
+        return true;
+    }
+
+    function writeOrReplace(payload, id) {
+        var value = editorValue();
+        var startTag = '<!--album-shot:' + id + '-->';
+        var endTag = '<!--/album-shot:' + id + '-->';
+        var s = value.indexOf(startTag);
+        var e = value.indexOf(endTag);
+        if (s !== -1 && e !== -1 && e > s) {
+            var next = value.slice(0, s) + payload + value.slice(e + endTag.length);
+            return writeEditorValue(next);
+        }
+        if (replaceNeedle) {
+            var at = value.indexOf(replaceNeedle);
+            if (at !== -1) {
+                return writeEditorValue(value.slice(0, at) + payload + value.slice(at + replaceNeedle.length));
+            }
+        }
+        if (window.CI_insertIntoEditor) {
+            return window.CI_insertIntoEditor('\n\n' + payload + '\n\n');
+        }
+        return false;
+    }
+
+    function extractBalancedDiv(html, start) {
+        var lower = html.toLowerCase();
+        if (lower.slice(start, start + 4) !== '<div') {
+            return null;
+        }
+        var depth = 0;
+        var i = start;
+        var len = html.length;
+        while (i < len) {
+            var nextOpen = lower.indexOf('<div', i);
+            var nextClose = lower.indexOf('</div', i);
+            if (nextClose === -1) {
+                return null;
+            }
+            if (nextOpen !== -1 && nextOpen < nextClose) {
+                depth += 1;
+                i = nextOpen + 4;
+            } else {
+                depth -= 1;
+                var gt = html.indexOf('>', nextClose);
+                if (gt === -1) {
+                    return null;
+                }
+                i = gt + 1;
+                if (depth === 0) {
+                    return html.slice(start, i);
+                }
+            }
+        }
+        return null;
+    }
+
+    function parseStyleMap(style) {
+        var map = {};
+        String(style || '').split(';').forEach(function (part) {
+            var cut = part.indexOf(':');
+            if (cut < 1) {
+                return;
+            }
+            map[part.slice(0, cut).trim().toLowerCase()] = part.slice(cut + 1).trim();
+        });
+        return map;
+    }
+
+    function pctFromStyle(v, fallback) {
+        var n = parseFloat(v);
+        return isFinite(n) ? n : (fallback || 0);
+    }
+
+    function parseBoardSnapshot(block, idHint) {
+        if (!block) {
+            return null;
+        }
+        var draftAttr = block.match(/\bdata-as-draft=["']([^"']+)["']/i);
+        if (draftAttr) {
+            var drafted = decodeDraft(draftAttr[1]);
+            if (drafted && typeof drafted === 'object') {
+                return drafted;
+            }
+        }
+        var wrap = document.createElement('div');
+        wrap.innerHTML = block;
+        var board = wrap.querySelector('.album-board');
+        if (!board) {
+            return null;
+        }
+        var ratio = board.getAttribute('data-ratio') || '3:2';
+        var parsedItems = [];
+        Array.prototype.forEach.call(board.querySelectorAll('.album-board-item, .album-board-text'), function (el) {
+            var st = parseStyleMap(el.getAttribute('style') || '');
+            var base = {
+                x: pctFromStyle(st.left, 4),
+                y: pctFromStyle(st.top, 4),
+                w: pctFromStyle(st.width, 40),
+                h: pctFromStyle(st.height, 20)
+            };
+            if (el.classList.contains('album-board-text')) {
+                var fsM = String(st['font-size'] || '').match(/([\d.]+)\s*\*\s*1cqw/i);
+                var htmlText = el.innerHTML || '';
+                var text = htmlText.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+                text = $('<textarea>').html(text).text();
+                parsedItems.push({
+                    type: 'text',
+                    text: $.trim(text) || '文字',
+                    x: base.x,
+                    y: base.y,
+                    w: base.w,
+                    h: base.h,
+                    fs: fsM ? parseFloat(fsM[1]) : 4.5,
+                    color: st.color || '#ffffff',
+                    align: st['text-align'] || 'left',
+                    weight: String(st['font-weight'] || '').indexOf('700') !== -1 || st['font-weight'] === 'bold' ? '700' : '400',
+                    shadow: st['text-shadow'] ? 1 : 0
+                });
+                return;
+            }
+            var img = el.querySelector('img');
+            var src = img ? (img.getAttribute('src') || '') : '';
+            if (!isUsableUrl(src)) {
+                return;
+            }
+            parsedItems.push({
+                type: 'image',
+                src: src,
+                alt: img ? (img.getAttribute('alt') || '') : '',
+                x: base.x,
+                y: base.y,
+                w: base.w,
+                h: base.h,
+                ox: pctFromStyle(st['--ox'], 50),
+                oy: pctFromStyle(st['--oy'], 50),
+                zoom: parseFloat(st['--zoom']) || 1
+            });
+        });
+        var imgN = 0;
+        parsedItems.forEach(function (it) {
+            if (!it || it.type !== 'text') {
+                imgN += 1;
+            }
+        });
+        var custom = ratio.indexOf(':') !== -1 && ['3:2', '16:9', '4:3', '1:1'].indexOf(ratio) === -1;
+        var parts = String(ratio).split(':');
+        return {
+            v: 1,
+            id: idHint || board.getAttribute('data-as-id') || '',
+            cat: imgN > 2 ? 'multi' : (imgN === 2 ? 'duo' : 'canvas'),
+            preset: 'canvas',
+            ratio: custom ? 'custom' : ratio,
+            ratioW: parts[0] || '3',
+            ratioH: parts[1] || '2',
+            layout: 'auto',
+            pos: 'top',
+            titlepos: 'above',
+            wrap: 0,
+            alt: '',
+            src: '',
+            items: parsedItems
+        };
+    }
+
+    function parseShotSnapshot(code) {
+        var raw = String(code || '');
+        var get = function (name) {
+            var m = raw.match(new RegExp('\\b' + name + '\\s*=\\s*"([^"]*)"', 'i'));
+            return m ? m[1] : '';
+        };
+        var src = get('src');
+        if (!isUsableUrl(src)) {
+            return null;
+        }
+        return {
+            v: 1,
+            id: '',
+            cat: 'single',
+            preset: '',
+            ratio: '3:2',
+            ratioW: '3',
+            ratioH: '2',
+            layout: get('layout') || 'auto',
+            pos: get('pos') || 'top',
+            titlepos: get('titlepos') || 'above',
+            wrap: get('wrap') ? 1 : 0,
+            alt: get('alt'),
+            src: src,
+            items: []
+        };
+    }
+
+    function covered(ranges, start, end) {
+        return ranges.some(function (r) {
+            return start < r.end && end > r.start;
+        });
+    }
+
+    function scanEditorBlocks() {
+        var html = editorValue();
+        var out = [];
+        var ranges = [];
+        var reWrap = /<!--\s*album-shot:([A-Za-z0-9_-]+)\s*-->([\s\S]*?)<!--\s*\/album-shot:\1\s*-->/g;
+        var m;
+        while ((m = reWrap.exec(html))) {
+            ranges.push({ start: m.index, end: m.index + m[0].length });
+            var inner = m[2];
+            var snap = null;
+            if (/class=["'][^"']*\balbum-board\b/i.test(inner) || /\balbum-board\b/.test(inner)) {
+                snap = parseBoardSnapshot(inner, m[1]);
+            } else if (/\[album-shot\b/i.test(inner)) {
+                var sm = inner.match(/\[album-shot\b[^\]]*\]/i);
+                snap = sm ? parseShotSnapshot(sm[0]) : null;
+            }
+            if (snap) {
+                snap.id = m[1];
+                out.push({
+                    id: m[1],
+                    raw: m[0],
+                    snapshot: snap,
+                    inEditor: true,
+                    savedAt: 0
+                });
+            }
+        }
+        var idx = 0;
+        while ((idx = html.indexOf('album-board', idx)) !== -1) {
+            var divStart = html.lastIndexOf('<div', idx);
+            if (divStart === -1) {
+                idx += 11;
+                continue;
+            }
+            var tagEnd = html.indexOf('>', divStart);
+            if (tagEnd === -1 || !/\balbum-board\b/.test(html.slice(divStart, tagEnd))) {
+                idx += 11;
+                continue;
+            }
+            var block = extractBalancedDiv(html, divStart);
+            if (!block) {
+                idx += 11;
+                continue;
+            }
+            var end = divStart + block.length;
+            idx = end;
+            if (covered(ranges, divStart, end)) {
+                continue;
+            }
+            ranges.push({ start: divStart, end: end });
+            var boardSnap = parseBoardSnapshot(block, '');
+            if (!boardSnap) {
+                continue;
+            }
+            var bid = boardSnap.id || ('as' + Math.abs(divStart).toString(36));
+            boardSnap.id = bid;
+            out.push({
+                id: bid,
+                raw: block,
+                snapshot: boardSnap,
+                inEditor: true,
+                savedAt: 0
+            });
+        }
+        var shotRe = /\[album-shot\b[^\]]*\]/gi;
+        var sm2;
+        while ((sm2 = shotRe.exec(html))) {
+            if (covered(ranges, sm2.index, sm2.index + sm2[0].length)) {
+                continue;
+            }
+            var shotSnap = parseShotSnapshot(sm2[0]);
+            if (!shotSnap) {
+                continue;
+            }
+            var sid = 'as' + Math.abs(sm2.index).toString(36);
+            shotSnap.id = sid;
+            out.push({
+                id: sid,
+                raw: sm2[0],
+                snapshot: shotSnap,
+                inEditor: true,
+                savedAt: 0
+            });
+        }
+        return out;
+    }
+
+    function collectHistoryView() {
+        var editor = scanEditorBlocks();
+        var ids = {};
+        editor.forEach(function (row) {
+            if (row.id) {
+                ids[row.id] = true;
+            }
+        });
+        var cid = postCid();
+        readLocalHistory().forEach(function (row) {
+            if (!row || !row.snapshot || ids[row.id]) {
+                return;
+            }
+            if (String(row.cid) !== cid && !(cid === '0' && (!row.cid || row.cid === '0'))) {
+                return;
+            }
+            editor.push({
+                id: row.id,
+                snapshot: row.snapshot,
+                inEditor: false,
+                local: true,
+                savedAt: row.savedAt || 0
+            });
+        });
+        return editor;
+    }
+
+    function updateHistStatus() {
+        var $el = $('#as-hist-status');
+        if (!$el.length) {
+            return;
+        }
+        if (!replaceOnInsert || !activeId) {
+            $el.prop('hidden', true).empty();
+            return;
+        }
+        $el.prop('hidden', false).html(
+            '已加载历史，再次插入将<strong>替换</strong>正文中的原块。'
+            + '<button type="button" class="btn btn-xs" id="as-hist-as-new">改为新插入</button>'
+        );
+    }
+
+    function renderHistory() {
+        var $list = $('#as-hist-list');
+        var $empty = $('#as-hist-empty');
+        var $count = $('#as-hist-count');
+        if (!$list.length) {
+            return;
+        }
+        historyView = collectHistoryView();
+        $count.text(String(historyView.length));
+        if (!historyView.length) {
+            $list.empty();
+            $empty.prop('hidden', false);
+            updateHistStatus();
+            return;
+        }
+        $empty.prop('hidden', true);
+        var html = '';
+        historyView.forEach(function (row, i) {
+            var snap = row.snapshot || {};
+            var thumb = snapshotThumb(snap);
+            var on = row.id && row.id === activeId && replaceOnInsert ? ' is-on' : '';
+            var badge = row.inEditor ? '正文' : '本地';
+            var when = formatHistTime(row.savedAt);
+            html += '<div class="as-hist-card' + on + '" data-hist="' + i + '" data-id="' + escapeHtml(row.id || '') + '">'
+                + '<span class="as-hist-thumb">'
+                + (thumb ? '<img src="' + escapeHtml(thumb) + '" alt="" loading="lazy">' : '<span class="as-hist-ph">文</span>')
+                + '</span>'
+                + '<span class="as-hist-meta">'
+                + '<span class="as-hist-title">' + escapeHtml(snapshotLabel(snap)) + '</span>'
+                + '<span class="as-hist-sub">' + escapeHtml(badge + (when ? ' · ' + when : '')) + '</span>'
+                + '</span>'
+                + (row.local && !row.inEditor
+                    ? '<button type="button" class="as-hist-del" data-del="' + escapeHtml(row.id || '') + '" title="删除本地记录">×</button>'
+                    : '<span></span>')
+                + '</div>';
+        });
+        $list.html(html);
+        updateHistStatus();
+    }
+
+    function applySnapshot(snap, rec) {
+        if (!snap) {
+            return;
+        }
+        loadingSnap = true;
+        activeId = snap.id || (rec && rec.id) || newRecordId();
+        replaceOnInsert = !!(rec && (rec.inEditor || rec.raw));
+        replaceNeedle = (rec && rec.raw) || '';
+        items = Array.isArray(snap.items) ? JSON.parse(JSON.stringify(snap.items)) : [];
+        selected = 0;
+        $('#as-cat').val(snap.cat || (items.length ? 'canvas' : 'single'));
+        syncUi();
+        if (snap.preset) {
+            $('#as-preset').val(snap.preset);
+        }
+        if (snap.ratio) {
+            $('#as-ratio').val(snap.ratio);
+        }
+        if (snap.ratioW) {
+            $('#as-ratio-w').val(snap.ratioW);
+        }
+        if (snap.ratioH) {
+            $('#as-ratio-h').val(snap.ratioH);
+        }
+        if (snap.layout) {
+            $('#as-layout').val(snap.layout);
+        }
+        if (snap.pos) {
+            $('#as-pos').val(snap.pos);
+        }
+        if (snap.titlepos) {
+            $('#as-titlepos').val(snap.titlepos);
+        }
+        $('#as-wrap').prop('checked', !!snap.wrap);
+        $('#as-alt').val(snap.alt || '');
+        $('#as-src').val(snap.src || '');
+        syncUi();
+        loadingSnap = false;
+        if (window.CI_refreshPreview) {
+            window.CI_refreshPreview();
+        }
+        window.setTimeout(function () {
+            paintBoard();
+            renderLibrary();
+            renderHistory();
+            bindDropZone();
+        }, 0);
     }
 
     function buildBoardHtml() {
+        if (!activeId) {
+            activeId = newRecordId();
+        }
         var ratio = currentRatio();
         var ratioCssVal = ratio.replace(':', ' / ');
-        var html = '<div class="album-board" data-ratio="' + escapeHtml(ratio) + '">'
+        var draft = encodeDraft(captureSnapshot());
+        var html = '<div class="album-board" data-ratio="' + escapeHtml(ratio) + '" data-as-id="' + escapeHtml(activeId) + '"'
+            + (draft ? ' data-as-draft="' + draft + '"' : '') + '>'
             + '<div class="album-board-stage" style="position:relative;width:100%;aspect-ratio:' + escapeHtml(ratioCssVal)
             + ';overflow:hidden;container-type:inline-size;--board-ratio:' + escapeHtml(ratioCssVal) + '">';
         items.forEach(function (it) {
@@ -684,6 +1293,7 @@
     window.CI_HANDLERS['album-shot'] = {
         onShow: function () {
             refreshLibrary();
+            renderHistory();
             syncUi();
             bindDropZone();
         },
@@ -705,8 +1315,21 @@
             return singlePreviewHtml();
         },
         insert: function (done) {
-            var code = buildShortcode();
-            if (code && window.CI_insertIntoEditor(code)) {
+            if (!replaceOnInsert || !activeId) {
+                activeId = newRecordId();
+                replaceNeedle = '';
+                replaceOnInsert = false;
+            }
+            var inner = buildShortcode();
+            if (!inner) {
+                return;
+            }
+            persistHistory();
+            var payload = wrapRecord(inner, activeId);
+            if (writeOrReplace(payload, activeId)) {
+                replaceOnInsert = false;
+                replaceNeedle = '';
+                renderHistory();
                 done();
             }
         }
@@ -717,6 +1340,9 @@
 
         $(document).on('change', '#as-cat, #as-preset, #as-ratio, #as-layout, #as-pos, #as-titlepos, #as-wrap, #as-alt', function () {
             var id = this.id;
+            if (loadingSnap) {
+                return;
+            }
             if (id === 'as-cat') {
                 syncUi();
                 if (isBoardMode() && items.length && cat() !== 'canvas') {
@@ -783,6 +1409,33 @@
         $(document).on('click', '#as-add-text', function (e) {
             e.preventDefault();
             addText();
+        });
+
+        $(document).on('click', '.as-hist-card', function (e) {
+            if ($(e.target).closest('.as-hist-del').length) {
+                return;
+            }
+            var i = parseInt($(this).attr('data-hist'), 10);
+            var rec = historyView[i];
+            if (!rec || !rec.snapshot) {
+                return;
+            }
+            applySnapshot(rec.snapshot, rec);
+        });
+
+        $(document).on('click', '.as-hist-del', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            removeLocalHistory($(this).attr('data-del') || '');
+        });
+
+        $(document).on('click', '#as-hist-as-new', function (e) {
+            e.preventDefault();
+            replaceOnInsert = false;
+            replaceNeedle = '';
+            activeId = newRecordId();
+            updateHistStatus();
+            renderHistory();
         });
 
         $(document).on('input change', '#as-text-fs, #as-text-color, #as-text-align, #as-text-bold, #as-text-shadow', function () {
