@@ -26,9 +26,11 @@ $this->need('header.php');
         <div class="meta-info">
             <i class="czs-calendar"></i>
             <time datetime="<?php $this->date('c'); ?>"><?php $this->date('Y-m-d D h:iA'); ?></time>
-            <a href="<?php $this->options->siteUrl(); ?>admin/write-post.php?cid=<?php $this->cid(); ?>" title="编辑">
+            <?php if ($this->user->hasLogin() && ($this->authorId == $this->user->uid || $this->user->pass('editor', true))): ?>
+            <a href="<?php $this->options->adminUrl('write-post.php?cid=' . $this->cid); ?>" title="编辑">
                 <i class="czs-pen-write"></i> 编辑
             </a>
+            <?php endif; ?>
             <?php if ($this->fields->pubPlace != ''): ?>
                 <br>
                 <i class="czs-location"></i>
