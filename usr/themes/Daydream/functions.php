@@ -444,73 +444,85 @@ function showUserAgent($ua) {
  * 注意：Typecho的themeInit函数在Archive Widget初始化后调用
  * 此时查询已经执行，所以这里主要用于其他初始化工作
  */
-function daydreamCommentDeletable($comments)
+function daydreamCurrentUser()
 {
-    $user = $comments->user;
+    return \Widget\User::alloc();
+}
+
+function daydreamCanDeleteCommentRow($user, array $comment)
+{
     if (!$user->hasLogin()) {
         return false;
     }
 
-    $authorId = (int) $comments->authorId;
+    $authorId = (int) $comment['authorId'];
     if ($authorId > 0 && $authorId === (int) $user->uid) {
         return true;
     }
 
     return $user->pass('contributor', true)
-        && ($user->pass('editor', true) || (int) $comments->ownerId === (int) $user->uid);
+        && ($user->pass('editor', true) || (int) $comment['ownerId'] === (int) $user->uid);
+}
+
+function daydreamCommentDeletable($comments)
+{
+    $user = daydreamCurrentUser();
+    return daydreamCanDeleteCommentRow($user, array(
+        'authorId' => $comments->authorId,
+        'ownerId' => $comments->ownerId,
+    ));
 }
 
 function daydreamCommentDeleteUrl($comments)
 {
-    $target = $comments->request->makeUriByRequest('comment-delete=' . (int) $comments->coid);
+    $target = Typecho_Request::getInstance()->makeUriByRequest('comment-delete=' . (int) $comments->coid);
     return \Widget\Security::alloc()->getTokenUrl($target);
+}
+
+function daydreamGoBack()
+{
+    $referer = Typecho_Request::getInstance()->getReferer();
+    if (!$referer) {
+        $referer = Helper::options()->siteUrl;
+    }
+    header('Location: ' . Typecho_Common::safeUrl($referer), true, 302);
+    exit;
 }
 
 function daydreamDeleteComment($archive)
 {
-    $coid = $archive->request->filter('int')->get('comment-delete');
-    if (!$coid) {
+    $coid = (int) Typecho_Request::getInstance()->get('comment-delete');
+    if ($coid <= 0) {
         return;
     }
 
-    $archive->security->protect();
-    if (!$archive->user->hasLogin()) {
-        $archive->response->goBack();
+    \Widget\Security::alloc()->protect();
+    $user = daydreamCurrentUser();
+    if (!$user->hasLogin()) {
+        daydreamGoBack();
     }
 
-    $db = \Typecho\Db::get();
+    $db = Typecho_Db::get();
     $comment = $db->fetchRow($db->select()->from('table.comments')->where('coid = ?', $coid)->limit(1));
     $deleted = false;
 
-    if ($comment) {
-        $authorId = (int) $comment['authorId'];
-        $canDelete = ($authorId > 0 && $authorId === (int) $archive->user->uid)
-            || (
-                $archive->user->pass('contributor', true)
-                && (
-                    $archive->user->pass('editor', true)
-                    || (int) $comment['ownerId'] === (int) $archive->user->uid
-                )
-            );
-
-        if ($canDelete) {
-            \Widget\Comments\Edit::pluginHandle()->delete($comment, $archive);
-            $db->query($db->delete('table.comments')->where('coid = ?', $coid));
-            if ('approved' == $comment['status']) {
-                $db->query($db->update('table.contents')
-                    ->expression('commentsNum', 'commentsNum - 1')
-                    ->where('cid = ? AND commentsNum > 0', $comment['cid']));
-            }
-            \Widget\Comments\Edit::pluginHandle()->finishDelete($comment, $archive);
-            $deleted = true;
+    if ($comment && daydreamCanDeleteCommentRow($user, $comment)) {
+        \Widget\Comments\Edit::pluginHandle()->delete($comment, $archive);
+        $db->query($db->delete('table.comments')->where('coid = ?', $coid));
+        if ('approved' == $comment['status']) {
+            $db->query($db->update('table.contents')
+                ->expression('commentsNum', 'commentsNum - 1')
+                ->where('cid = ? AND commentsNum > 0', $comment['cid']));
         }
+        \Widget\Comments\Edit::pluginHandle()->finishDelete($comment, $archive);
+        $deleted = true;
     }
 
     \Widget\Notice::alloc()->set(
         $deleted ? _t('评论已经被删除') : _t('没有评论被删除'),
         $deleted ? 'success' : 'notice'
     );
-    $archive->response->goBack();
+    daydreamGoBack();
 }
 
 function themeInit($archive) {
