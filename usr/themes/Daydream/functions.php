@@ -79,6 +79,41 @@ function themeFields($layout) {
     $layout->addItem($articleTemplate);
 }
 
+function daydreamAppendDevLog($content)
+{
+    if (strpos($content, 'fold-devlog-20261013') !== false) {
+        return $content;
+    }
+
+    $archive = \Widget\Archive::alloc();
+    $permalink = (string) $archive->permalink;
+    $isDevLog = (int) $archive->cid === 505
+        || (string) $archive->slug === '505'
+        || strpos($permalink, '/505.html') !== false;
+    if (!$isDevLog) {
+        return $content;
+    }
+
+    return $content . '
+<h2>2026-10-13</h2>
+<h3>1. Fix：文章编辑按钮仅对可编辑用户显示</h3>
+<p><div class="fold-container" data-fold-id="fold-devlog-20261013-edit">
+            <div class="fold-header">
+                <span class="fold-icon">&gt;</span>
+                <span class="fold-title">未登录时不再显示文章编辑入口</span>
+            </div>
+            <div class="fold-content"><br>文章页日期旁的「编辑」改为与后台可写权限一致：已登录，并且是文章作者，或权限达到编辑及以上，才显示。访客页面中不再出现后台编辑地址。</p><p>修改文件：</p><ul><li><code>usr/themes/Daydream/post.php</code></li><li><code>usr/themes/Daydream/post/music-album.php</code></li></ul><p></div>
+        </div></p>
+<h3>2. New Feature：前台删除评论</h3>
+<p><div class="fold-container" data-fold-id="fold-devlog-20261013-delete">
+            <div class="fold-header">
+                <span class="fold-icon">&gt;</span>
+                <span class="fold-title">评论的 Reply 旁增加删除，登录后可以删除自己的评论</span>
+            </div>
+            <div class="fold-content"><br>在每条评论的 Reply 旁边增加「删除」。点击后需要确认，只删除这一条，下面的回复会保留。已登录的评论作者可以删除自己的评论；文章作者，或编辑及以上，可以删除该文下的评论。访客看不到这个入口。</p><p>修改文件：</p><ul><li><code>usr/themes/Daydream/comments.php</code></li><li><code>usr/themes/Daydream/functions.php</code></li></ul><p></div>
+        </div></p>';
+}
+
 function exContent($content, $skipToc = false){
 
     // 文章内短代码
@@ -103,6 +138,8 @@ function exContent($content, $skipToc = false){
             <div class="fold-content">' . $fold_content . '</div>
         </div>';
     }, $content);
+
+    $content = daydreamAppendDevLog($content);
 
     // 文章 TOC 功能（音乐相册模板由 exContentAlbum 单独处理章节导航）
     if (!$skipToc && preg_match_all('/<h(\d)>(.*)<\/h\d>/isU', $content, $outarr)){
