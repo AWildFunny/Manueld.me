@@ -32,6 +32,9 @@
                 <?php showUserAgent($comments->agent); ?>
                 <small><?php showLocation($comments->ip); ?></small>
                 <small><?php $comments->reply('<i class="czs-pen-write"></i> Reply'); ?></small>
+                <?php if (daydreamCommentDeletable($comments)): ?>
+                <small><a href="<?php echo htmlspecialchars(daydreamCommentDeleteUrl($comments), ENT_QUOTES, 'UTF-8'); ?>" onclick="return confirm('确认删除这条评论吗？');">删除</a></small>
+                <?php endif; ?>
                 <?php if ($comments->status == 'waiting'): ?>
                     <small><i class="czs-talk-l"></i> 等待审核</small>
                 <?php endif; ?>
